@@ -1,1 +1,1 @@
-# SolARModuleCeres
+# SolARModuleNonFreeOpenCV

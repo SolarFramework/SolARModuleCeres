@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<xpcf-registry>
+    <module uuid="22a1243c-4aa1-49a6-990b-cbab4d0785f1" name="SolARModuleCeres" path="$BCOMDEVROOT/bcomBuild/SolARModuleCeres/0.4.0/lib/x86_64/shared">
+        <component uuid="e317076a-8776-4763-9c0b-96fe6edeea30" description="SolARBundlerCeres">
+                <interface uuid="125f2007-1bf9-421d-9367-fbdc1210d006" description="IComponentIntrospect"/>
+                <interface uuid="35b9bdb7-d23c-4909-984f-ae7f9a292e6c" description="IBundler"/>
+        </component>
+    </module>
+</xpcf-registry>
