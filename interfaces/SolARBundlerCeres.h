@@ -50,10 +50,12 @@ namespace SolAR {
 
 
                 bool updateCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
-                                        std::vector<SRef<CloudPoint>>&mapToAdjust);
+                                        std::vector<SRef<CloudPoint>>&mapToAdjust,
+                                        std::vector<int>&selectedKeyframes);
 
                 bool updateMap(std::vector<SRef<CloudPoint>>&mapToAdjust);
-                bool updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust);
+                bool updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust,
+                                     std::vector<int>&selectedKeyframes);
                 bool updateIntrinsic(std::vector<SRef<Keyframe>>&framesToAdjust);
 
 
@@ -113,6 +115,56 @@ namespace SolAR {
                         r(2) = 0.5*a*(R(1,0) - R(0,1)) ;
                     }
 
+                }
+
+                inline void iRodrigues(Vector3d &r, Transform3Df&R){
+
+                    const double small = 1e-6 ;
+
+                    double th = sqrt(r(0)*r(0) +
+                                     r(1)*r(1) +
+                                     r(2)*r(2) ) ;
+
+                    if( th < small ) {
+                        R(0,0) = 1.0 ; R(0,1) = 0.0 ; R(0,2) = 0.0 ;
+                        R(1,0) = 0.0 ; R(1,1) = 1.0 ; R(1,2) = 0.0 ;
+                        R(2,0) = 0.0 ; R(2,1) = 0.0 ; R(2,2) = 1.0 ;
+                        return ;
+                    }
+
+                    {
+                        double x = r(0) / th ;
+                        double y = r(1) / th ;
+                        double z = r(2) / th ;
+
+                        double xx = x*x ;
+                        double xy = x*y ;
+                        double xz = x*z ;
+                        double yy = y*y ;
+                        double yz = y*z ;
+                        double zz = z*z ;
+
+                        const double yx = xy ;
+                        const double zx = xz ;
+                        const double zy = yz ;
+
+                        double sth  = sin(th) ;
+                        double cth  = cos(th) ;
+                        double mcth = 1.0 - cth ;
+
+                        R(0,0) = 1          - mcth * (yy+zz) ;
+                        R(1,0) =     sth*z  + mcth * xy ;
+                        R(2,0) =   - sth*y  + mcth * xz ;
+
+                        R(0,1) =   - sth*z  + mcth * yx ;
+                        R(1,1) = 1          - mcth * (zz+xx) ;
+                        R(2,1) =     sth*x  + mcth * yz ;
+
+                        R(0,2) =     sth*y  + mcth * xz ;
+                        R(1,2) =   - sth*x  + mcth * yz ;
+                        R(2,2) = 1          - mcth * (xx+yy) ;
+
+                    }
                 }
 
 

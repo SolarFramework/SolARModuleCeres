@@ -296,7 +296,7 @@ namespace SolAR {
                     std::cout<<"2->apply ceres problem"<<std::endl;
                     solveCeresProblem();
                     std::cout<<"3->apply ceres problem"<<std::endl;
-                    updateCeresProblem(framesToAdjust, mapToAdjust);
+                    updateCeresProblem(framesToAdjust, mapToAdjust, selectedKeyframes);
                     return true;
                 }
 
@@ -452,38 +452,48 @@ namespace SolAR {
                 }
 
                 bool SolARBundlerCeres::updateMap(std::vector<SRef<CloudPoint>>&mapToAdjust){
-                    int idx0 = 0;
-                    for (int j = 0; j < get_cameras(); ++j) {
-                        for (int jj = 0; jj < 9; ++jj) {
-                            ++idx0;
-                        }
-                    }
-
-                    int idx1 = idx0;
                     for (int j = 0; j < get_points(); ++j) {
-                        double x = m_parameters[idx1];
-                         ++idx1;
-                        double y = m_parameters[idx1];
-                         ++idx1;
-                        double z =m_parameters[idx1];
-                         ++idx1;
-                        double reprj_err = 0;  std::vector<int>visibility = std::vector<int>(50, -1);
+                        double x = m_parameters[(j * 3 + 0) + (CAM_DIM * get_cameras())];
+                        double y = m_parameters[(j * 3 + 1) + (CAM_DIM * get_cameras())];
+                        double z = m_parameters[(j * 3 + 2) + (CAM_DIM * get_cameras())];
+
+                        double reprj_err = mapToAdjust[j]->getReprojError();
+                        std::vector<int>visibility = mapToAdjust[j]->getVisibility();
                         mapToAdjust[j] = xpcf::utils::make_shared<CloudPoint>(x, y, z,0.0,0.0,0.0,reprj_err,visibility);
                     }
+
                     return true;
                 }
-                bool SolARBundlerCeres::updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust){
-                    // do some stuff !
-                       return true;
+                bool SolARBundlerCeres::updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust,
+                                                        std::vector<int>&selectedKeyframes){
+                    for (int j = 0; j < selectedKeyframes.size(); ++j) {
+                        int idx =  selectedKeyframes[j];
+                        Vector3d r,t, f;
+                        r[0] = m_parameters[CAM_DIM * j + 0];
+                        r[1] = m_parameters[CAM_DIM * j + 1];
+                        r[2] = m_parameters[CAM_DIM * j + 2];
+
+                        iRodrigues(r,framesToAdjust[idx]->m_pose);
+
+                        framesToAdjust[idx]->m_pose(0,3) = m_parameters[CAM_DIM * j + 3];
+                        framesToAdjust[idx]->m_pose(1,3) = m_parameters[CAM_DIM * j + 4];
+                        framesToAdjust[idx]->m_pose(2,3) = m_parameters[CAM_DIM * j + 5];
+
+                        f[0] = m_parameters[CAM_DIM * j + 6];
+                        f[1] = m_parameters[CAM_DIM * j + 7];
+                        f[2] = m_parameters[CAM_DIM * j + 8];
+                    }
+                  return true;
                 }
                 bool SolARBundlerCeres::updateIntrinsic(std::vector<SRef<Keyframe>>&framesToAdjust){
                     // do some stuff !
                     return true;
                 }
                 bool SolARBundlerCeres::updateCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
-                                                           std::vector<SRef<CloudPoint>>&mapToAdjust){
+                                                           std::vector<SRef<CloudPoint>>&mapToAdjust,
+                                                           std::vector<int>&selectedKeyframes){
                     updateMap(mapToAdjust);
-                    updateExtrinsic(framesToAdjust);
+                    updateExtrinsic(framesToAdjust,selectedKeyframes);
                     updateIntrinsic(framesToAdjust);
                     return true;
                 }
