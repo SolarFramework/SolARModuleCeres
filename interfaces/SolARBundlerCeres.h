@@ -197,6 +197,9 @@ namespace SolAR {
                     return mutable_points() + m_pointIndex[i] * 3;
                 }
 
+                double m_pHeight;
+                double m_pWidth;
+
                 int m_camerasNo;
                 int m_pointsNo;
                 int m_observationsNo;

@@ -305,7 +305,10 @@ namespace SolAR {
                                                          std::vector<SRef<CloudPoint>>&mapToAdjust,
                                                          std::vector<int>&selectedKeyframes){
 
-                    bool global_bundling = true;
+                   m_pHeight = (double)framesToAdjust[0]->m_view->getHeight()/2.0;
+                   m_pWidth  = (double)framesToAdjust[0]->m_view->getWidth()/2.0;
+
+                   bool global_bundling = true;
                     if( selectedKeyframes.size() > 0){
                         global_bundling = false;
                     }
@@ -318,8 +321,8 @@ namespace SolAR {
                                     ceresObserv v;
                                     ++m_observations;
                                    int idx = mapToAdjust[i]->m_visibility[j];
-                                    v.oPt  = Point2Df(framesToAdjust[j]->getKeyPoints()[idx]->getX() - 1536.0,
-                                                      framesToAdjust[j]->getKeyPoints()[idx]->getY() - 1024.0);
+                                    v.oPt  = Point2Df(framesToAdjust[j]->getKeyPoints()[idx]->getX() - m_pWidth,
+                                                      framesToAdjust[j]->getKeyPoints()[idx]->getY() - m_pHeight);
                                     v.cIdx = j;
                                     v.pIdx = i;
 
@@ -341,8 +344,8 @@ namespace SolAR {
                                         ceresObserv v;
                                         ++m_observations;
                                         int idx = mapToAdjust[i]->m_visibility[j];
-                                        v.oPt  = Point2Df(framesToAdjust[j]->getKeyPoints()[idx]->getX() - 1536.0,
-                                                          framesToAdjust[j]->getKeyPoints()[idx]->getY() - 1024.0);
+                                        v.oPt  = Point2Df(framesToAdjust[j]->getKeyPoints()[idx]->getX() - m_pWidth,
+                                                          framesToAdjust[j]->getKeyPoints()[idx]->getY() - m_pHeight);
                                         v.cIdx = j;
                                         v.pIdx = i;
                                         observations_temp.push_back(v);
