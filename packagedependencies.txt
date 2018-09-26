@@ -6,3 +6,5 @@ eigen|3.3.5|eigen|thirdParties|http://repository.b-com.com/amc-generic
 ceres|1.14.0|ceres|thirdParties|http://repository.b-com.com/amc-generic
 glog|0.3.5|glog|thirdParties|http://repository.b-com.com/amc-generic
 gflags|2.2.1|gflags|thirdParties|http://repository.b-com.com/amc-generic
+opencv|3.2.0|opencv|thirdParties|http://repository.b-com.com/amc-generic
+
