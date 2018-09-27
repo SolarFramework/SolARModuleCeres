@@ -34,7 +34,9 @@ namespace SolAR {
 
                bool adjustBundle(std::vector<SRef<Keyframe>>&framesToAdjust,
                                  std::vector<SRef<CloudPoint>>&mapToAdjust,
-                                 std::vector<int>&selectedKeyframes) override final;
+                                 const CamCalibration &K,
+                                 const CamDistortion &D,
+                                 const std::vector<int>&selectKeyframes) override final;
 
 
                 void unloadComponent () override final;
@@ -45,17 +47,19 @@ namespace SolAR {
                 bool solveCeresProblem();
                 void fillCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                                       std::vector<SRef<CloudPoint>>&mapToAdjust,
-                                      std::vector<int>&selectedKeyframes);
+                                      const CamCalibration &K,
+                                      const CamDistortion &D,
+                                      const std::vector<int>&selectedKeyframes);
 
 
 
                 bool updateCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                                         std::vector<SRef<CloudPoint>>&mapToAdjust,
-                                        std::vector<int>&selectedKeyframes);
+                                        const std::vector<int>&selectedKeyframes);
 
                 bool updateMap(std::vector<SRef<CloudPoint>>&mapToAdjust);
                 bool updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust,
-                                     std::vector<int>&selectedKeyframes);
+                                     const std::vector<int>&selectedKeyframes);
                 bool updateIntrinsic(std::vector<SRef<Keyframe>>&framesToAdjust);
 
 

@@ -121,6 +121,9 @@ namespace SolAR {
                     // Compute final projected point position.
                     const T& focal = camera[6];
 
+
+              //      std::cout<<"    camera parameters  f: "<<focal<<"  l1: "<<l1<<"  l2: "<<l2<<std::endl;
+
                     T predicted_x = focal * distortion * xp;
                     T predicted_y = focal * distortion * yp;
 
@@ -188,8 +191,8 @@ namespace SolAR {
                         // dimensional residual. Internally, the cost function stores the observed
                         // image location and compares the reprojection against the observation.
                         ceres::CostFunction* cost_function =
-                            SnavelyReprojectionError::Create(observations[OBSERV_DIM * i + 0],
-                                                             observations[OBSERV_DIM * i + 1]);
+                            SnavelyReprojectionError::Create(observations[2 * i + 0],
+                                                             observations[2 * i + 1]);
 
                         /*
                         std::cout<<"    #observation: "<<observations[2*i + 0]<<" "<<observations[2*i + 1]<<std::endl;
@@ -290,23 +293,32 @@ namespace SolAR {
 
                 bool SolARBundlerCeres::adjustBundle(std::vector<SRef<Keyframe>>&framesToAdjust,
                                                      std::vector<SRef<CloudPoint>>&mapToAdjust,
-                                                     std::vector<int>&selectedKeyframes){
+                                                     const CamCalibration &K,
+                                                     const CamDistortion &D,
+                                                     const std::vector<int>&selectKeyframes){
                     std::cout<<"1->fill ceres problem"<<std::endl;
-                    fillCeresProblem(framesToAdjust, mapToAdjust, selectedKeyframes);
+                    fillCeresProblem(framesToAdjust,
+                                     mapToAdjust,
+                                     K,
+                                     D,
+                                     selectKeyframes);
                     std::cout<<"2->apply ceres problem"<<std::endl;
                     solveCeresProblem();
                     std::cout<<"3->apply ceres problem"<<std::endl;
-                    updateCeresProblem(framesToAdjust, mapToAdjust, selectedKeyframes);
+                    updateCeresProblem(framesToAdjust,
+                                       mapToAdjust,
+                                       selectKeyframes);
                     return true;
                 }
 
 
                 void SolARBundlerCeres::fillCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                                                          std::vector<SRef<CloudPoint>>&mapToAdjust,
-                                                         std::vector<int>&selectedKeyframes){
+                                                         const CamCalibration &K,
+                                                         const CamDistortion &D,
+                                                         const std::vector<int>&selectedKeyframes){
 
-                   m_pHeight = (double)framesToAdjust[0]->m_view->getHeight()/2.0;
-                   m_pWidth  = (double)framesToAdjust[0]->m_view->getWidth()/2.0;
+
 
                    bool global_bundling = true;
                     if( selectedKeyframes.size() > 0){
@@ -321,8 +333,8 @@ namespace SolAR {
                                     ceresObserv v;
                                     ++m_observations;
                                    int idx = mapToAdjust[i]->m_visibility[j];
-                                    v.oPt  = Point2Df(framesToAdjust[j]->getKeyPoints()[idx]->getX() - m_pWidth,
-                                                      framesToAdjust[j]->getKeyPoints()[idx]->getY() - m_pHeight);
+                                    v.oPt  = Point2Df(framesToAdjust[j]->getKeyPoints()[idx]->getX() - K(0,2),
+                                                      framesToAdjust[j]->getKeyPoints()[idx]->getY() - K(1,2));
                                     v.cIdx = j;
                                     v.pIdx = i;
 
@@ -344,8 +356,8 @@ namespace SolAR {
                                         ceresObserv v;
                                         ++m_observations;
                                         int idx = mapToAdjust[i]->m_visibility[j];
-                                        v.oPt  = Point2Df(framesToAdjust[j]->getKeyPoints()[idx]->getX() - m_pWidth,
-                                                          framesToAdjust[j]->getKeyPoints()[idx]->getY() - m_pHeight);
+                                        v.oPt  = Point2Df(framesToAdjust[j]->getKeyPoints()[idx]->getX() - K(0,2),
+                                                          framesToAdjust[j]->getKeyPoints()[idx]->getY() - K(1,2));
                                         v.cIdx = j;
                                         v.pIdx = i;
                                         observations_temp.push_back(v);
@@ -389,9 +401,9 @@ namespace SolAR {
                             m_parameters[CAM_DIM*i+4] = framesToAdjust[m_cameraIndex[i]]->m_pose(1,3) ;
                             m_parameters[CAM_DIM*i+5] = framesToAdjust[m_cameraIndex[i]]->m_pose(2,3) ;
 
-                            m_parameters[CAM_DIM*i+6] = 2759.0 ;
-                            m_parameters[CAM_DIM*i+7] = 0.0 ;
-                            m_parameters[CAM_DIM*i+8] = 0.0 ;
+                            m_parameters[CAM_DIM*i+6] = K(0,0) ;
+                            m_parameters[CAM_DIM*i+7] = D(0) ;
+                            m_parameters[CAM_DIM*i+8] = D(1) ;
 
                     }
                     std::cout<<"    1.4->filling parameters (points): "<<std::endl;
@@ -468,7 +480,7 @@ namespace SolAR {
                     return true;
                 }
                 bool SolARBundlerCeres::updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust,
-                                                        std::vector<int>&selectedKeyframes){
+                                                        const std::vector<int>&selectedKeyframes){
                     for (int j = 0; j < selectedKeyframes.size(); ++j) {
                         int idx =  selectedKeyframes[j];
                         Vector3d r,t, f;
@@ -494,7 +506,7 @@ namespace SolAR {
                 }
                 bool SolARBundlerCeres::updateCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                                                            std::vector<SRef<CloudPoint>>&mapToAdjust,
-                                                           std::vector<int>&selectedKeyframes){
+                                                           const std::vector<int>&selectedKeyframes){
                     updateMap(mapToAdjust);
                     updateExtrinsic(framesToAdjust,selectedKeyframes);
                     updateIntrinsic(framesToAdjust);
