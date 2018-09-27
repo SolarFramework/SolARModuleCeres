@@ -6,8 +6,7 @@
 #include <fstream>
 #include <utility>
 
-#include "ceres/ceres.h"
-#include "ceres/rotation.h"
+
 
 
 using namespace std;
@@ -28,7 +27,6 @@ namespace SolAR {
                     bool operator()(const T* const camera,
                         const T* const point,
                         T* residuals) const {
-
 
                         // camera[0,1,2] are the angle-axis rotation.
                         T p[3];
@@ -124,18 +122,28 @@ namespace SolAR {
                 }
 
 
+                void SolARBundlerCeres::initCeresProbelm(){
+                    m_options.linear_solver_type = ceres::ITERATIVE_SCHUR;
+                    m_options.preconditioner_type = ceres::SCHUR_JACOBI;
+                    m_options.dense_linear_algebra_library_type = ceres::LAPACK;
+                    m_options.max_num_iterations = 20;
+                    m_options.num_threads = 4;
+                    m_options.num_linear_solver_threads = 4;
+                    m_options.logging_type = ceres::SILENT;
+
+                }
                 bool SolARBundlerCeres::adjustBundle(const std::string&path_bundle,
                                                      std::vector<SRef<CloudPoint>>& cloud_before,
                                                      std::vector<SRef<CloudPoint>>& cloud_after){
 
 
-
-                    std::cout<<" starting ceres bundle.."<<std::endl;
+                   std::cout<<"0->init ceres problem"<<std::endl;
+                   initCeresProbelm();
+                   std::cout<<"1->fill ceres problem"<<std::endl;
                     if (!fillCeresProblemFromFile(path_bundle)) {
                         std::cerr << "ERROR: unable to open file " << path_bundle << "\n";
                         return 1;
                     }
-                    ceres::Problem problem;
                     for (int i = 0; i <m_observationsNo; ++i) {
 
                         // Each Residual block takes a point and a camera as input and outputs a 2
@@ -145,7 +153,7 @@ namespace SolAR {
                             SnavelyReprojectionError::Create(m_observations[OBSERV_DIM * i + 0],
                                                              m_observations[OBSERV_DIM * i + 1]);
 
-                        problem.AddResidualBlock(cost_function,
+                        m_problem.AddResidualBlock(cost_function,
                                                  NULL,
                                                  mutable_camera_for_observation(i),
                                                  mutable_point_for_observation(i));
@@ -154,20 +162,9 @@ namespace SolAR {
                     // Make Ceres automatically detect the bundle structure. Note that the
                     // standard solver, SPARSE_NORMAL_CHOLESKY, also works fine but it is slower
                     // for standard bundle adjustment problems.
-                    ceres::Solver::Options options;
-
                     int points_no = get_points();
                     cloud_after.resize(points_no);
                     cloud_before.resize(points_no);
-
-                    options.linear_solver_type = ceres::ITERATIVE_SCHUR;
-                    options.preconditioner_type = ceres::SCHUR_JACOBI;
-                    options.dense_linear_algebra_library_type = ceres::LAPACK;
-                    options.max_num_iterations = 20;
-                    options.num_threads = 1;
-                    options.num_linear_solver_threads = 1;
-                    options.logging_type = ceres::SILENT;
-
                     for (int j = 0; j < get_points(); ++j) {
                         double x = m_parameters[(j * 3 + 0) + (CAM_DIM * get_cameras())];
                         double y = m_parameters[(j * 3 + 1) + (CAM_DIM * get_cameras())];
@@ -178,11 +175,12 @@ namespace SolAR {
                         cloud_before[j] = xpcf::utils::make_shared<CloudPoint>(x, y, z,0.0,0.0,0.0,reprj_err,visibility);
                     }
 
+                    std::cout<<"2->apply ceres problem"<<std::endl;
                     ceres::Solver::Summary summary;
-                    ceres::Solve(options, &problem, &summary);
+                    ceres::Solve(m_options, &m_problem, &summary);
                     std::cout << summary.FullReport() << "\n";
 
-
+                    std::cout<<"3->update ceres problem"<<std::endl;
                     for (int j = 0; j < get_points(); ++j) {
                         double x = m_parameters[(j * 3 + 0) + (CAM_DIM * get_cameras())];
                         double y = m_parameters[(j * 3 + 1) + (CAM_DIM * get_cameras())];
@@ -202,6 +200,8 @@ namespace SolAR {
                                                      const CamCalibration &K,
                                                      const CamDistortion &D,
                                                      const std::vector<int>&selectKeyframes){
+                    std::cout<<"0->init ceres problem"<<std::endl;
+                    initCeresProbelm();
                     std::cout<<"1->fill ceres problem"<<std::endl;
                     fillCeresProblem(framesToAdjust,
                                      mapToAdjust,
@@ -210,7 +210,7 @@ namespace SolAR {
                                      selectKeyframes);
                     std::cout<<"2->apply ceres problem"<<std::endl;
                     solveCeresProblem();
-                    std::cout<<"3->apply ceres problem"<<std::endl;
+                    std::cout<<"3->update ceres problem"<<std::endl;
                     updateCeresProblem(framesToAdjust,
                                        mapToAdjust,
                                        selectKeyframes);
@@ -324,34 +324,20 @@ namespace SolAR {
                 }
 
                 bool SolARBundlerCeres::solveCeresProblem(){
-                    ceres::Problem problem;
-                    std::cout<<"debug ceres bundle..!"<<std::endl;
-                    std::cout<<" number of observation: "<<num_observations()<<std::endl;
                     for (int i = 0; i < num_observations(); ++i) {
                         ceres::CostFunction* cost_function =
                             SnavelyReprojectionError::Create(m_observations[OBSERV_DIM * i + 0],
                                                              m_observations[OBSERV_DIM * i + 1]);
 
-                        problem.AddResidualBlock(cost_function,
+                        m_problem.AddResidualBlock(cost_function,
                                                  NULL /* squared loss */,
                                                  mutable_camera_for_observation(i),
                                                  mutable_point_for_observation(i));
                     }
 
-                    ceres::Solver::Options options;
-
-                    options.linear_solver_type = ceres::ITERATIVE_SCHUR;
-                    options.preconditioner_type = ceres::SCHUR_JACOBI;
-                    options.dense_linear_algebra_library_type = ceres::LAPACK;
-                    options.max_num_iterations = 20;
-                    options.num_threads = 1;
-                    options.num_linear_solver_threads = 1;
-                    options.logging_type = ceres::SILENT;
-
-
                     ceres::Solver::Summary summary;
-                    ceres::Solve(options, &problem, &summary);
-                      std::cout << summary.FullReport() << "\n";
+                    ceres::Solve(m_options, &m_problem, &summary);
+                    std::cout << summary.FullReport() << "\n";
                     return true;
                 }
 

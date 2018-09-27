@@ -7,7 +7,8 @@
 #include <vector>
 #include "SolARCeresAPI.h"
 
-
+#include "ceres/ceres.h"
+#include "ceres/rotation.h"
 
 
 
@@ -45,6 +46,7 @@ namespace SolAR {
 
             private :
 
+                void initCeresProbelm();
                 bool solveCeresProblem();
                 void fillCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                                       std::vector<SRef<CloudPoint>>&mapToAdjust,
@@ -210,6 +212,8 @@ namespace SolAR {
                     }
                 }
 
+                ceres::Problem m_problem;
+                ceres::Solver::Options m_options;
 
                 double m_pHeight;
                 double m_pWidth;
