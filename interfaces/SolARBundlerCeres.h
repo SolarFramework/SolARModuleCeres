@@ -11,6 +11,7 @@
 
 
 
+
 #include <string>
 
 #define POINT_DIM 3
@@ -51,7 +52,7 @@ namespace SolAR {
                                       const CamDistortion &D,
                                       const std::vector<int>&selectedKeyframes);
 
-
+                bool fillCeresProblemFromFile(const std::string&path_ba);
 
                 bool updateCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                                         std::vector<SRef<CloudPoint>>&mapToAdjust,
@@ -200,6 +201,15 @@ namespace SolAR {
                 double* mutable_point_for_observation(int i) {
                     return mutable_points() + m_pointIndex[i] * 3;
                 }
+
+                template<typename T>
+                void FscanfOrDie(FILE *fptr, const char *format, T *value) {
+                    int num_scanned = fscanf(fptr, format, value);
+                    if (num_scanned != 1) {
+                       std::cerr << "Invalid UW data file."<<std::endl;
+                    }
+                }
+
 
                 double m_pHeight;
                 double m_pWidth;
