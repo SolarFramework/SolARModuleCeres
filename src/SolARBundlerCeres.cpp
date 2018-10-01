@@ -39,8 +39,8 @@ namespace SolAR {
                         // Compute the center of distortion. The sign change comes from
                         // the camera model that Noah Snavely's Bundler assumes, whereby
                         // the camera coordinate system has a negative z axis.
-                        T xp = -p[0] / p[2];
-                        T yp = -p[1] / p[2];
+                        T xp = +p[0] / p[2];
+                        T yp = +p[1] / p[2];
                         // Apply second and fourth order radial distortion.
                         const T& l1 = camera[7];
                         const T& l2 = camera[8];
@@ -127,8 +127,8 @@ namespace SolAR {
                     m_options.preconditioner_type = ceres::SCHUR_JACOBI;
                     m_options.dense_linear_algebra_library_type = ceres::LAPACK;
                     m_options.max_num_iterations = 20;
-                    m_options.num_threads = 4;
-                    m_options.num_linear_solver_threads = 4;
+                    m_options.num_threads = 1;
+                    m_options.num_linear_solver_threads = 1;
                     m_options.logging_type = ceres::SILENT;
 
                 }
