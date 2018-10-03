@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define USE_FREE
+//#define USE_FREE
 
 
 #include <iostream>
@@ -136,7 +136,7 @@ int run_bundle(){
     auto descriptorExtractor =xpcfComponentManager->create<SolARDescriptorsExtractorAKAZE2Opencv>()->bindTo<features::IDescriptorsExtractor>();
 #else
    auto  keypointsDetector = xpcfComponentManager->create<SolARKeypointDetectorNonFreeOpencv>()->bindTo<features::IKeypointDetector>();
-   auto descriptorExtractor = xpcfComponentManager->create<SolARDescriptorsExtractorSIFTOpencv>()->bindTo<features::IDescriptorsExtractor>();
+   auto descriptorExtractor = xpcfComponentManager->create<SolARDescriptorsExtractorSURF64Opencv>()->bindTo<features::IDescriptorsExtractor>();
 #endif
 
     auto matcher =xpcfComponentManager->create<SolARDescriptorMatcherKNNOpencv>()->bindTo<features::IDescriptorMatcher>();
@@ -202,8 +202,8 @@ int run_bundle(){
                                               keyframePoses[1],
                                               cloud);
 
-    double new_reproj_error;
-    basic_mapFiltering(cloud, 2.0,new_reproj_error);
+//    double new_reproj_error;
+//    basic_mapFiltering(cloud, 2.0,new_reproj_error);
 
     for(unsigned int v = 0; v < 2; ++v){
         keyframe[v] = xpcf::utils::make_shared<Keyframe>(views[v],
@@ -232,18 +232,24 @@ int run_bundle(){
                           camera->getDistorsionParameters(),
                           selectedKeyframes);
 
+
     cloud_after_ba = *poseGraph->getMap()->getPointCloud();
+
+    std::vector<Transform3Df>KeyframePoses_after;
+
+    KeyframePoses_after.push_back(poseGraph->getKeyframes()[0]->m_pose);
+    KeyframePoses_after.push_back(poseGraph->getKeyframes()[1]->m_pose);
 
     std::cout<<" after: "<<cloud_after_ba.size()<<std::endl;
 
-    std::vector<unsigned int>color0 = {255,0,0}; // color for cloud before
-    std::vector<unsigned int>color1 = {0,0,255}; // color for cloud after
+    std::vector<float>color0 = {1.0,0,0}; // color for cloud before
+    std::vector<float>color1 = {0,0,1.0}; // color for cloud after
 
     while(true){
         if (viewer3DPoints->displayClouds(cloud_before_ba,
-                                          cloud_after_ba,
-                                          color0,
-                                          color1) == FrameworkReturnCode::_STOP){
+                                                  cloud_after_ba,
+                                                  color0,
+                                                  color1) == FrameworkReturnCode::_STOP){
             return 0;
         }
     }
