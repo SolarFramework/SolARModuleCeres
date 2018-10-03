@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define USE_FREE
+#define USE_FREE
 
 
 #include <iostream>
@@ -201,6 +201,9 @@ int run_bundle(){
                                               keyframePoses[0],
                                               keyframePoses[1],
                                               cloud);
+
+    double new_reproj_error;
+    basic_mapFiltering(cloud, 2.0,new_reproj_error);
 
     for(unsigned int v = 0; v < 2; ++v){
         keyframe[v] = xpcf::utils::make_shared<Keyframe>(views[v],
