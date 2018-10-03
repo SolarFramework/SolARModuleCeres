@@ -14,62 +14,241 @@
  * limitations under the License.
  */
 
+//#define USE_FREE
+
+
 #include <iostream>
 #include <string>
 #include <vector>
+
 #include <boost/log/core.hpp>
+// ADD COMPONENTS HEADERS HERE
+
+#include "SolARModuleOpencv_traits.h"
+#include "SolARModuleOpengl_traits.h"
+#include "SolARModuleNonFreeOpencv_traits.h"
+#include "SolARModuleCeres_traits.h"
+
+
 #include "xpcf/xpcf.h"
 
-// ADD COMPONENTS HEADERS HERE, e.g #include "SolarComponent.h"
+#include "api/input/devices/ICamera.h"
+#include "api/features/IKeypointDetector.h"
+#include "api/features/IDescriptorsExtractor.h"
+#include "api/features/IDescriptorMatcher.h"
+#include "api/solver/pose/I3DTransformFinderFrom2D2D.h"
+#include "api/solver/map/ITriangulator.h"
+#include "api/solver/map/IMapper.h"
+#include "api/solver/map/IMapFilter.h"
+#include "api/solver/pose/I2D3DCorrespondencesFinder.h"
+#include "api/solver/pose/I3DTransformFinderFrom2D3D.h"
+#include "api/features/IMatchesFilter.h"
+#include "api/display/ISideBySideOverlay.h"
+#include "api/display/I2DOverlay.h"
+#include "api/display/I3DOverlay.h"
+#include "api/display/IImageViewer.h"
+#include "api/display/I3DPointsViewer.h"
 
-#include "SolARModuleCeres_traits.h"
+#include "api/image/IImageLoader.h"
 #include "api/solver/map/IBundler.h"
 
-namespace xpcf  = org::bcom::xpcf;
+#include "SolAROpenCVHelper.h"
+#include "opencv2/highgui.hpp"
+#include "opencv2/core.hpp"
+
 
 using namespace SolAR;
 using namespace SolAR::datastructure;
 using namespace SolAR::api;
+using namespace SolAR::MODULES::OPENCV;
+using namespace SolAR::MODULES::NONFREEOPENCV;
+using namespace SolAR::MODULES::OPENGL;
 using namespace SolAR::MODULES::CERES;
-namespace xpcf  = org::bcom::xpcf;
 
-int main(int argc,char* argv[])
-{
-#if NDEBUG
-    boost::log::core::get()->set_logging_enabled(false);
-#endif
 
+namespace xpcf = org::bcom::xpcf;
+
+struct streamConfig{
+
+  std::string m_dir;
+  int m_viewsNo;
+
+  void show(){
+      std::cout<<"  ->stream configuration: "<<std::endl;
+      std::cout<<"      # views directory: "<<m_dir<<std::endl;
+            std::cout<<"      # views number: "<<m_viewsNo<<std::endl;
+  }
+
+  bool load(std::string&path){
+      std::ifstream ox(path);
+      if(!ox.is_open()){
+          std::cerr<<" can't read stream config file from: "<<path<<std::endl;
+          return false;
+      }
+      else{
+          std::string v[2];
+          for(int i = 0; i < 2; ++i)
+              ox>>v[i];
+          m_dir = v[0];
+          m_viewsNo = std::stoi(v[1]);
+          show();
+
+          return true;
+      }
+  }
+  streamConfig(){
+      m_dir = ""; m_viewsNo = 0;
+  }
+  streamConfig(std::string a, int b): m_dir(a), m_viewsNo(b){}
+};
+
+void basic_mapFiltering( std::vector<SRef<CloudPoint>>&in, double thresh, double&reproj_err){
+     std::vector<SRef<CloudPoint>> out;
+     out.reserve(in.size());
+    reproj_err = 0.0;
+    for(const auto &p: in){
+        if(p->getReprojError()<thresh){
+            out.push_back(p);
+            reproj_err+= p->getReprojError();
+        }
+    }
+    in = out;
+    reproj_err/=(double)out.size();
+}
+int run_bundle(){
+    std::string path_stream = "stream_config.txt";
+    streamConfig* mStream = new streamConfig();
+    mStream->load(path_stream);
     LOG_ADD_LOG_TO_CONSOLE();
 
     /* instantiate component manager*/
     /* this is needed in dynamic mode */
     SRef<xpcf::IComponentManager> xpcfComponentManager = xpcf::getComponentManagerInstance();
-
-    if(xpcfComponentManager->load("conf_Ceres.xml")!=org::bcom::xpcf::_SUCCESS)
+    if(xpcfComponentManager->load("bundle_config.xml")!=org::bcom::xpcf::_SUCCESS)
     {
-        LOG_ERROR("Failed to load the configuration file conf_Ceres.xml")
+        LOG_ERROR("Failed to load the configuration file bundle_config.xml")
+        return -1;
+    }
+    LOG_INFO("Start creating components");
+    auto camera =xpcfComponentManager->create<SolARCameraOpencv>()->bindTo<input::devices::ICamera>();
+#ifdef USE_FREE
+    auto keypointsDetector =xpcfComponentManager->create<SolARKeypointDetectorOpencv>()->bindTo<features::IKeypointDetector>();
+    auto descriptorExtractor =xpcfComponentManager->create<SolARDescriptorsExtractorAKAZE2Opencv>()->bindTo<features::IDescriptorsExtractor>();
+#else
+   auto  keypointsDetector = xpcfComponentManager->create<SolARKeypointDetectorNonFreeOpencv>()->bindTo<features::IKeypointDetector>();
+   auto descriptorExtractor = xpcfComponentManager->create<SolARDescriptorsExtractorSIFTOpencv>()->bindTo<features::IDescriptorsExtractor>();
+#endif
+
+    auto matcher =xpcfComponentManager->create<SolARDescriptorMatcherKNNOpencv>()->bindTo<features::IDescriptorMatcher>();
+    auto poseFinderFrom2D2D =xpcfComponentManager->create<SolARPoseFinderFrom2D2DOpencv>()->bindTo<solver::pose::I3DTransformFinderFrom2D2D>();
+    auto mapper =xpcfComponentManager->create<SolARSVDTriangulationOpencv>()->bindTo<solver::map::ITriangulator>();
+    auto mapFilter =xpcfComponentManager->create<SolARMapFilterOpencv>()->bindTo<solver::map::IMapFilter>();
+    auto poseGraph =xpcfComponentManager->create<SolARMapperOpencv>()->bindTo<solver::map::IMapper>();
+    auto viewer3DPoints =xpcfComponentManager->create<SolAR3DPointsViewerOpengl>()->bindTo<display::I3DPointsViewer>();
+    auto bundler =xpcfComponentManager->create<SolARBundlerCeres>()->bindTo<api::solver::map::IBundler>();
+
+
+
+    std::vector<SRef<Image>>                            views;
+    SRef<Keyframe>                                      keyframe[2];
+    std::vector<SRef<Keypoint>>                         keypoints[2];
+    SRef<DescriptorBuffer>                              descriptors[2];
+    std::vector<DescriptorMatch>                        matches;
+    std::vector<SRef<CloudPoint>>                       cloud;
+    std::vector<Transform3Df>                           keyframePoses;
+
+    views.resize(mStream->m_viewsNo);
+    cv::Mat cvView;
+    LOG_INFO("loading views: ");
+    for(unsigned int i = 0; i < mStream->m_viewsNo; ++i){
+        std::string path_temp = mStream->m_dir + std::to_string(i) + ".png";
+        cvView = cv::imread(path_temp);
+        SolAROpenCVHelper::convertToSolar(cvView, views[i]);
+    }
+
+    keyframePoses.resize(2);
+    poseFinderFrom2D2D->setCameraParameters(camera->getIntrinsicsParameters(), camera->getDistorsionParameters());
+    mapper->setCameraParameters(camera->getIntrinsicsParameters(), camera->getDistorsionParameters());
+
+    LOG_DEBUG("Intrincic parameters : \n {}", camera->getIntrinsicsParameters());
+
+    if (camera->start() != FrameworkReturnCode::_SUCCESS) // videoFile
+    {
+        LOG_ERROR("Camera cannot start");
         return -1;
     }
 
-    // declare and create components
-    LOG_INFO("Start creating components");
+    for(unsigned int v = 0; v < 2; ++v){
+        keypointsDetector->detect(views[v], keypoints[v]);
+        descriptorExtractor->extract(views[v], keypoints[v], descriptors[v]);
+    }
+    matcher->match(descriptors[0], descriptors[1], matches);
 
-    SRef<solver::map::IBundler> bundler = xpcfComponentManager->create<SolARBundlerCeres>()->bindTo<solver::map::IBundler>();
+    int nbOriginalMatches = matches.size();
+    keyframePoses[0] = Transform3Df::Identity();
 
-    if (binaryMarker->loadMarker() != FrameworkReturnCode::_SUCCESS)
-    {
-        LOG_ERROR("Cannot load marker file with path {}", binaryMarker->bindTo<xpcf::IConfigurable>()->getProperty("filePath")->getStringValue());
-        return 0;
+    // Estimate the pose of of the second frame (the first frame being the reference of our coordinate system)
+    poseFinderFrom2D2D->estimate(keypoints[0], keypoints[1], keyframePoses[0], keyframePoses[1], matches);
+
+    LOG_INFO("Nb matches for triangulation: {}\\{}", matches.size(), nbOriginalMatches);
+    LOG_INFO("Estimate pose of the camera for the frame 2: \n {}", keyframePoses[1].matrix());
+
+    // Triangulate
+    double reproj_error = mapper->triangulate(keypoints[0],
+                                              keypoints[1],
+                                              matches,
+                                              std::make_pair(0, 1),
+                                              keyframePoses[0],
+                                              keyframePoses[1],
+                                              cloud);
+
+    for(unsigned int v = 0; v < 2; ++v){
+        keyframe[v] = xpcf::utils::make_shared<Keyframe>(views[v],
+                                                         descriptors[v],
+                                                         v,
+                                                         keyframePoses[v],
+                                                         keypoints[v]);
     }
 
-    // Display the world size of the marker in the console
-    LOG_INFO("Marker size width: {} ",binaryMarker->getWidth());
-    LOG_INFO("Marker size height: {}",binaryMarker->getHeight());
+    poseGraph->initMap(keyframe[0],
+                       keyframe[1],
+                       cloud,
+                       matches);
 
-    // Display the pattern information in the console, w=white=1 case, b=black=0 case.
-    LOG_INFO("Marker pattern: \n{}", binaryMarker->getPattern()->getPatternMatrix());
 
+    std::vector<int>selectedKeyframes = {0,1};
+
+    std::vector<SRef<CloudPoint>>cloud_before_ba;
+    std::vector<SRef<CloudPoint>>cloud_after_ba;
+
+    cloud_before_ba = *poseGraph->getMap()->getPointCloud();
+
+    bundler->adjustBundle(poseGraph->getKeyframes(),
+                          *poseGraph->getMap()->getPointCloud(),
+                          camera->getIntrinsicsParameters(),
+                          camera->getDistorsionParameters(),
+                          selectedKeyframes);
+
+    cloud_after_ba = *poseGraph->getMap()->getPointCloud();
+
+    std::cout<<" after: "<<cloud_after_ba.size()<<std::endl;
+
+    std::vector<unsigned int>color0 = {255,0,0}; // color for cloud before
+    std::vector<unsigned int>color1 = {0,0,255}; // color for cloud after
+
+    while(true){
+        if (viewer3DPoints->displayClouds(cloud_before_ba,
+                                          cloud_after_ba,
+                                          color0,
+                                          color1) == FrameworkReturnCode::_STOP){
+            return 0;
+        }
+    }
     return 0;
+}
+int main(){
+  run_bundle();
+  return 0;
 }
 
 

@@ -93,36 +93,10 @@ namespace SolAR {
                 #endif
                 }
 
-                bool SolARBundlerCeres::fillCeresProblemFromFile(const std::string&filename){
-                    FILE* fptr = fopen(filename.c_str(), "r");
-                    if (fptr == NULL) {
-                        return false;
-                    };
-                    FscanfOrDie(fptr, "%d", &m_camerasNo);
-                    FscanfOrDie(fptr, "%d", &m_pointsNo);
-                    FscanfOrDie(fptr, "%d", &m_observationsNo);
-
-                    m_pointIndex = new int[m_observationsNo];
-                    m_cameraIndex = new int[m_observationsNo];
-                    m_observations = new double[OBSERV_DIM * m_observationsNo];
-                    m_parametersNo = CAM_DIM * m_camerasNo + POINT_DIM * m_pointsNo;
-                    m_parameters = new double[m_parametersNo];
-                    for (int i = 0; i < m_observationsNo; ++i) {
-                        FscanfOrDie(fptr, "%d", m_cameraIndex + i);
-                        FscanfOrDie(fptr, "%d", m_pointIndex + i);
-                        for (int j = 0; j < OBSERV_DIM; ++j) {
-                            FscanfOrDie(fptr, "%lf", m_observations + OBSERV_DIM * i + j);
-                        }
-                    }
-                    for (int i = 0; i < m_parametersNo; ++i) {
-                        FscanfOrDie(fptr, "%lf", m_parameters + i);
-                    }
-                    return true;
-
-                }
 
 
-                void SolARBundlerCeres::initCeresProbelm(){
+
+                void SolARBundlerCeres::initCeresProblem(){
                     m_options.linear_solver_type = ceres::ITERATIVE_SCHUR;
                     m_options.preconditioner_type = ceres::SCHUR_JACOBI;
                     m_options.dense_linear_algebra_library_type = ceres::LAPACK;
@@ -132,68 +106,6 @@ namespace SolAR {
                     m_options.logging_type = ceres::SILENT;
 
                 }
-                bool SolARBundlerCeres::adjustBundle(const std::string&path_bundle,
-                                                     std::vector<SRef<CloudPoint>>& cloud_before,
-                                                     std::vector<SRef<CloudPoint>>& cloud_after){
-
-
-                   std::cout<<"0->init ceres problem"<<std::endl;
-                   initCeresProbelm();
-                   std::cout<<"1->fill ceres problem"<<std::endl;
-                    if (!fillCeresProblemFromFile(path_bundle)) {
-                        std::cerr << "ERROR: unable to open file " << path_bundle << "\n";
-                        return 1;
-                    }
-                    for (int i = 0; i <m_observationsNo; ++i) {
-
-                        // Each Residual block takes a point and a camera as input and outputs a 2
-                        // dimensional residual. Internally, the cost function stores the observed
-                        // image location and compares the reprojection against the observation.
-                        ceres::CostFunction* cost_function =
-                            SnavelyReprojectionError::Create(m_observations[OBSERV_DIM * i + 0],
-                                                             m_observations[OBSERV_DIM * i + 1]);
-
-                        m_problem.AddResidualBlock(cost_function,
-                                                 NULL,
-                                                 mutable_camera_for_observation(i),
-                                                 mutable_point_for_observation(i));
-                    }
-
-                    // Make Ceres automatically detect the bundle structure. Note that the
-                    // standard solver, SPARSE_NORMAL_CHOLESKY, also works fine but it is slower
-                    // for standard bundle adjustment problems.
-                    int points_no = get_points();
-                    cloud_after.resize(points_no);
-                    cloud_before.resize(points_no);
-                    for (int j = 0; j < get_points(); ++j) {
-                        double x = m_parameters[(j * 3 + 0) + (CAM_DIM * get_cameras())];
-                        double y = m_parameters[(j * 3 + 1) + (CAM_DIM * get_cameras())];
-                        double z = m_parameters[(j * 3 + 2) + (CAM_DIM * get_cameras())];
-
-                        double reprj_err = 0.0;
-                        std::vector<int>visibility = std::vector<int>(50, -1);
-                        cloud_before[j] = xpcf::utils::make_shared<CloudPoint>(x, y, z,0.0,0.0,0.0,reprj_err,visibility);
-                    }
-
-                    std::cout<<"2->apply ceres problem"<<std::endl;
-                    ceres::Solver::Summary summary;
-                    ceres::Solve(m_options, &m_problem, &summary);
-                    std::cout << summary.FullReport() << "\n";
-
-                    std::cout<<"3->update ceres problem"<<std::endl;
-                    for (int j = 0; j < get_points(); ++j) {
-                        double x = m_parameters[(j * 3 + 0) + (CAM_DIM * get_cameras())];
-                        double y = m_parameters[(j * 3 + 1) + (CAM_DIM * get_cameras())];
-                        double z = m_parameters[(j * 3 + 2) + (CAM_DIM * get_cameras())];
-
-                        double reprj_err = 0.0;
-                        std::vector<int>visibility = std::vector<int>(50, -1);
-
-                        cloud_after[j] = xpcf::utils::make_shared<CloudPoint>(x, y, z,0.0,0.0,0.0,reprj_err,visibility);
-                    }
-
-                    return true;
-                }
 
                 bool SolARBundlerCeres::adjustBundle(std::vector<SRef<Keyframe>>&framesToAdjust,
                                                      std::vector<SRef<CloudPoint>>&mapToAdjust,
@@ -201,7 +113,7 @@ namespace SolAR {
                                                      const CamDistortion &D,
                                                      const std::vector<int>&selectKeyframes){
                     std::cout<<"0->init ceres problem"<<std::endl;
-                    initCeresProbelm();
+                    initCeresProblem();
                     std::cout<<"1->fill ceres problem"<<std::endl;
                     fillCeresProblem(framesToAdjust,
                                      mapToAdjust,
@@ -341,22 +253,6 @@ namespace SolAR {
                     return true;
                 }
 
-                bool SolARBundlerCeres::saveBundleProblem(std::string&path_bal){
-
-                    std::cout<<"2->saving ceres problem "<<std::endl;
-                    std::ofstream fileCeres(path_bal);
-                    fileCeres<<m_camerasNo<<" "<<m_pointsNo<<" "<<m_observationsNo<<std::endl;
-                    for(int i = 0; i < m_observationsNo; ++i){
-                        fileCeres<<" "<<m_cameraIndex[i]<<" "<<m_pointIndex[i]<<" "
-                                 <<m_observations[OBSERV_DIM*i  + 0]<<" "<<m_observations[OBSERV_DIM*i + 1]<<std::endl;
-                    }
-                    std::cout<<" parameters no: "<<m_parametersNo<<std::endl;
-                    for(int i = 0; i < m_parametersNo; ++i){
-                        fileCeres<<m_parameters[i]<<std::endl;
-                    }
-                    fileCeres.close();
-                    return true;
-                }
 
                 bool SolARBundlerCeres::updateMap(std::vector<SRef<CloudPoint>>&mapToAdjust){
                     for (int j = 0; j < get_points(); ++j) {

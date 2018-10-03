@@ -30,9 +30,6 @@ namespace SolAR {
                 SolARBundlerCeres();
                 ~SolARBundlerCeres() = default;
 
-               bool adjustBundle(const std::string&path_bundle,
-                                  std::vector<SRef<CloudPoint>>& cloud_before,
-                                  std::vector<SRef<CloudPoint>>& cloud_after) override final;
 
                bool adjustBundle(std::vector<SRef<Keyframe>>&framesToAdjust,
                                  std::vector<SRef<CloudPoint>>&mapToAdjust,
@@ -42,11 +39,10 @@ namespace SolAR {
 
 
                 void unloadComponent () override final;
-                bool saveBundleProblem(std::string&path_ba) override final;
 
             private :
 
-                void initCeresProbelm();
+                void initCeresProblem();
                 bool solveCeresProblem();
                 void fillCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                                       std::vector<SRef<CloudPoint>>&mapToAdjust,
@@ -54,7 +50,6 @@ namespace SolAR {
                                       const CamDistortion &D,
                                       const std::vector<int>&selectedKeyframes);
 
-                bool fillCeresProblemFromFile(const std::string&path_ba);
 
                 bool updateCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                                         std::vector<SRef<CloudPoint>>&mapToAdjust,
