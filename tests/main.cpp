@@ -226,7 +226,8 @@ int run_bundle(){
 
     cloud_before_ba = *poseGraph->getMap()->getPointCloud();
 
-    bundler->adjustBundle(poseGraph->getKeyframes(),
+    std::vector<SRef<Keyframe>> kf=poseGraph->getKeyframes();
+    bundler->adjustBundle(kf,
                           *poseGraph->getMap()->getPointCloud(),
                           camera->getIntrinsicsParameters(),
                           camera->getDistorsionParameters(),
