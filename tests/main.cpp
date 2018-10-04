@@ -247,6 +247,8 @@ int run_bundle(){
     std::vector<float>color_noba = {1.0,0.0,0.0}; // color for cloud before
     std::vector<float>color_withba = {0.0,1.0,0.0}; // color for cloud after
 
+    // here the drawing cameras!
+
     while(true){
         if (viewer3DPoints->displayCloudsAndPoses(cloud_before_ba,
                                                   cloud_after_ba,
