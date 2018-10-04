@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define USE_FREE
+#define USE_FREE
 
 
 #include <iostream>
@@ -116,6 +116,8 @@ void basic_mapFiltering( std::vector<SRef<CloudPoint>>&in, double thresh, double
     reproj_err/=(double)out.size();
 }
 int run_bundle(){
+
+    // stream config need data folder (ask for it).
     std::string path_stream = "stream_config.txt";
     streamConfig* mStream = new streamConfig();
     mStream->load(path_stream);
@@ -242,14 +244,16 @@ int run_bundle(){
 
     std::cout<<" after: "<<cloud_after_ba.size()<<std::endl;
 
-    std::vector<float>color0 = {1.0,0,0}; // color for cloud before
-    std::vector<float>color1 = {0,0,1.0}; // color for cloud after
+    std::vector<float>color_noba = {1.0,0.0,0.0}; // color for cloud before
+    std::vector<float>color_withba = {0.0,1.0,0.0}; // color for cloud after
 
     while(true){
-        if (viewer3DPoints->displayClouds(cloud_before_ba,
+        if (viewer3DPoints->displayCloudsAndPoses(cloud_before_ba,
                                                   cloud_after_ba,
-                                                  color0,
-                                                  color1) == FrameworkReturnCode::_STOP){
+                                                  keyframePoses,
+                                                  KeyframePoses_after,
+                                                  color_noba,
+                                                  color_withba) == FrameworkReturnCode::_STOP){
             return 0;
         }
     }
