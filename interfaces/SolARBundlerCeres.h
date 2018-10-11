@@ -42,6 +42,7 @@ namespace SolAR {
 
             private :
 
+
                 void initCeresProblem();
                 bool solveCeresProblem();
                 void fillCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,

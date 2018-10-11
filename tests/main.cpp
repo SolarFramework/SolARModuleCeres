@@ -28,7 +28,7 @@
 #include "SolARModuleOpengl_traits.h"
 #include "SolARModuleNonFreeOpencv_traits.h"
 #include "SolARModuleCeres_traits.h"
-
+#include "SolARModuleTools_traits.h"
 
 #include "xpcf/xpcf.h"
 
@@ -64,7 +64,7 @@ using namespace SolAR::MODULES::OPENCV;
 using namespace SolAR::MODULES::NONFREEOPENCV;
 using namespace SolAR::MODULES::OPENGL;
 using namespace SolAR::MODULES::CERES;
-
+using namespace SolAR::MODULES::TOOLS;
 
 namespace xpcf = org::bcom::xpcf;
 
@@ -144,10 +144,11 @@ int run_bundle(){
     auto matcher =xpcfComponentManager->create<SolARDescriptorMatcherKNNOpencv>()->bindTo<features::IDescriptorMatcher>();
     auto poseFinderFrom2D2D =xpcfComponentManager->create<SolARPoseFinderFrom2D2DOpencv>()->bindTo<solver::pose::I3DTransformFinderFrom2D2D>();
     auto mapper =xpcfComponentManager->create<SolARSVDTriangulationOpencv>()->bindTo<solver::map::ITriangulator>();
-    auto mapFilter =xpcfComponentManager->create<SolARMapFilterOpencv>()->bindTo<solver::map::IMapFilter>();
-    auto poseGraph =xpcfComponentManager->create<SolARMapperOpencv>()->bindTo<solver::map::IMapper>();
+    auto poseGraph =xpcfComponentManager->create<SolARMapper>()->bindTo<solver::map::IMapper>();
     auto viewer3DPoints =xpcfComponentManager->create<SolAR3DPointsViewerOpengl>()->bindTo<display::I3DPointsViewer>();
     auto bundler =xpcfComponentManager->create<SolARBundlerCeres>()->bindTo<api::solver::map::IBundler>();
+
+    auto  mapFilter =xpcfComponentManager->create<SolARMapFilter>()->bindTo<solver::map::IMapFilter>();
 
 
 
@@ -156,17 +157,22 @@ int run_bundle(){
     std::vector<SRef<Keypoint>>                         keypoints[2];
     SRef<DescriptorBuffer>                              descriptors[2];
     std::vector<DescriptorMatch>                        matches;
-    std::vector<SRef<CloudPoint>>                       cloud;
+    std::vector<SRef<CloudPoint>>                       cloud, filtredCloud;
     std::vector<Transform3Df>                           keyframePoses;
 
+    SRef<Map> map;
     views.resize(mStream->m_viewsNo);
     cv::Mat cvView;
     LOG_INFO("loading views: ");
+    int c = 0;
     for(unsigned int i = 0; i < mStream->m_viewsNo; ++i){
         std::string path_temp = mStream->m_dir + std::to_string(i) + ".png";
         cvView = cv::imread(path_temp);
+        if(!cvView.empty()) ++c;
         SolAROpenCVHelper::convertToSolar(cvView, views[i]);
     }
+    std::cout<<c <<"/"<<mStream->m_viewsNo<<" loaded correctly"<<std::endl;
+
 
     keyframePoses.resize(2);
     poseFinderFrom2D2D->setCameraParameters(camera->getIntrinsicsParameters(), camera->getDistorsionParameters());
@@ -204,20 +210,21 @@ int run_bundle(){
                                               keyframePoses[1],
                                               cloud);
 
-//    double new_reproj_error;
-//    basic_mapFiltering(cloud, 2.0,new_reproj_error);
 
     for(unsigned int v = 0; v < 2; ++v){
-        keyframe[v] = xpcf::utils::make_shared<Keyframe>(views[v],
+        keyframe[v] = xpcf::utils::make_shared<Keyframe>(keypoints[v],
                                                          descriptors[v],
-                                                         v,
-                                                         keyframePoses[v],
-                                                         keypoints[v]);
+                                                         views[v],
+                                                         keyframePoses[v]);
     }
 
-    poseGraph->initMap(keyframe[0],
+    mapFilter->filter(keyframePoses[0], keyframePoses[1], cloud, filtredCloud);
+
+
+    poseGraph->update(map, keyframe[0]);
+    poseGraph->update(map,
                        keyframe[1],
-                       cloud,
+                       filtredCloud,
                        matches);
 
 
@@ -236,12 +243,17 @@ int run_bundle(){
                           selectedKeyframes);
 
 
+
     cloud_after_ba = *poseGraph->getMap()->getPointCloud();
 
     std::vector<Transform3Df>KeyframePoses_after;
+    Transform3Df p0,p1;
 
-    KeyframePoses_after.push_back(poseGraph->getKeyframes()[0]->m_pose);
-    KeyframePoses_after.push_back(poseGraph->getKeyframes()[1]->m_pose);
+    p0 = (poseGraph->getKeyframes()[0]->getPose());
+    p1 = (poseGraph->getKeyframes()[1]->getPose());
+
+    KeyframePoses_after.push_back(p0);
+    KeyframePoses_after.push_back(p1);
 
     std::cout<<" after: "<<cloud_after_ba.size()<<std::endl;
 
@@ -260,6 +272,7 @@ int run_bundle(){
             return 0;
         }
     }
+
     return 0;
 }
 int main(){

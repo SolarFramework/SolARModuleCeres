@@ -87,6 +87,7 @@ namespace SolAR {
 
                 SolARBundlerCeres::SolARBundlerCeres():ComponentBase(xpcf::toUUID<SolARBundlerCeres>())
                 {
+                    std::cout<<"##########################ADDING INTERFACES"<<std::endl;
                      addInterface<IBundler>(this);
                 #ifdef DEBUG
                     std::cout << " SolARBundlerCeres constructor" << std::endl;
@@ -146,14 +147,16 @@ namespace SolAR {
                     if(global_bundling){
                         std::cout<<" global bundler "<<std::endl;
                         for(int i = 0; i < mapToAdjust.size(); ++i){
-                            for(unsigned int j = 0; j < mapToAdjust[i]->m_visibility.size(); ++j){
-                                if(mapToAdjust[i]->m_visibility[j] != -1){
+                            std::map<unsigned int, unsigned int> visibility = mapToAdjust[i]->getVisibility();
+                            int idxFrame = 0;
+                            for (std::map<unsigned int, unsigned int>::iterator it = visibility.begin(); it != visibility.end(); ++it, ++idxFrame ){
+                                if(it->second  != -1){
                                     ceresObserv v;
                                     ++m_observations;
-                                   int idx = mapToAdjust[i]->m_visibility[j];
-                                    v.oPt  = Point2Df(framesToAdjust[j]->getKeyPoints()[idx]->getX() - K(0,2),
-                                                      framesToAdjust[j]->getKeyPoints()[idx]->getY() - K(1,2));
-                                    v.cIdx = j;
+                                   int idx = it->second;
+                                    v.oPt  = Point2Df(framesToAdjust[idxFrame]->getKeypoints()[idx]->getX() - K(0,2),
+                                                      framesToAdjust[idxFrame]->getKeypoints()[idx]->getY() - K(1,2));
+                                    v.cIdx = idxFrame;
                                     v.pIdx = i;
 
                                     observations_temp.push_back(v);
@@ -168,15 +171,17 @@ namespace SolAR {
                         std::cout<<"}"<<std::endl;
 
                         for(int i = 0; i < mapToAdjust.size(); ++i){
-                            for(unsigned int j = 0; j < mapToAdjust[i]->m_visibility.size(); ++j){
+                            std::map<unsigned int, unsigned int> visibility = mapToAdjust[i]->getVisibility();
+                            int idxFrame = 0;
+                            for (std::map<unsigned int, unsigned int>::iterator it = visibility.begin(); it != visibility.end(); ++it, ++idxFrame){
                                 for(int c = 0; c < selectedKeyframes.size(); ++c){
-                                    if(j == selectedKeyframes[c] && mapToAdjust[i]->m_visibility[j] != -1){
+                                    if(idxFrame == selectedKeyframes[c] && it->second != -1){
                                         ceresObserv v;
                                         ++m_observations;
-                                        int idx = mapToAdjust[i]->m_visibility[j];
-                                        v.oPt  = Point2Df(framesToAdjust[j]->getKeyPoints()[idx]->getX() - K(0,2),
-                                                          framesToAdjust[j]->getKeyPoints()[idx]->getY() - K(1,2));
-                                        v.cIdx = j;
+                                         int idx = it->second;
+                                        v.oPt  = Point2Df(framesToAdjust[idxFrame]->getKeypoints()[idx]->getX() - K(0,2),
+                                                          framesToAdjust[idxFrame]->getKeypoints()[idx]->getY() - K(1,2));
+                                        v.cIdx = idxFrame;
                                         v.pIdx = i;
                                         observations_temp.push_back(v);
                                     }
@@ -210,14 +215,15 @@ namespace SolAR {
 
                     for(int  i = 0; i < m_camerasNo; ++i){
                             Vector3f r;
-                            toRodrigues(framesToAdjust[m_cameraIndex[i]]->m_pose, r);
+                            Transform3Df pose_temp = framesToAdjust[m_cameraIndex[i]]->getPose();
+                            toRodrigues(pose_temp, r);
                             m_parameters[CAM_DIM*i+0] = r[0] ;
                             m_parameters[CAM_DIM*i+1] = r[1] ;
                             m_parameters[CAM_DIM*i+2] = r[2] ;
 
-                            m_parameters[CAM_DIM*i+3] = framesToAdjust[m_cameraIndex[i]]->m_pose(0,3) ;
-                            m_parameters[CAM_DIM*i+4] = framesToAdjust[m_cameraIndex[i]]->m_pose(1,3) ;
-                            m_parameters[CAM_DIM*i+5] = framesToAdjust[m_cameraIndex[i]]->m_pose(2,3) ;
+                            m_parameters[CAM_DIM*i+3] = pose_temp(0,3) ;
+                            m_parameters[CAM_DIM*i+4] = pose_temp(1,3) ;
+                            m_parameters[CAM_DIM*i+5] = pose_temp(2,3) ;
 
                             m_parameters[CAM_DIM*i+6] = K(0,0) ;
                             m_parameters[CAM_DIM*i+7] = D(0) ;
@@ -261,7 +267,7 @@ namespace SolAR {
                         double z = m_parameters[(j * 3 + 2) + (CAM_DIM * get_cameras())];
 
                         double reprj_err = mapToAdjust[j]->getReprojError();
-                        std::vector<int>visibility = mapToAdjust[j]->getVisibility();
+                        std::map<unsigned int, unsigned int>visibility = mapToAdjust[j]->getVisibility();
                         mapToAdjust[j] = xpcf::utils::make_shared<CloudPoint>(x, y, z,0.0,0.0,0.0,reprj_err,visibility);
                     }
 
@@ -272,19 +278,22 @@ namespace SolAR {
                     for (int j = 0; j < selectedKeyframes.size(); ++j) {
                         int idx =  selectedKeyframes[j];
                         Vector3d r,t, f;
+                        Transform3Df pose_temp;
                         r[0] = m_parameters[CAM_DIM * j + 0];
                         r[1] = m_parameters[CAM_DIM * j + 1];
                         r[2] = m_parameters[CAM_DIM * j + 2];
 
-                        iRodrigues(r,framesToAdjust[idx]->m_pose);
+                        iRodrigues(r,pose_temp);
 
-                        framesToAdjust[idx]->m_pose(0,3) = m_parameters[CAM_DIM * j + 3];
-                        framesToAdjust[idx]->m_pose(1,3) = m_parameters[CAM_DIM * j + 4];
-                        framesToAdjust[idx]->m_pose(2,3) = m_parameters[CAM_DIM * j + 5];
+                        pose_temp(0,3) = m_parameters[CAM_DIM * j + 3];
+                        pose_temp(1,3) = m_parameters[CAM_DIM * j + 4];
+                        pose_temp(2,3) = m_parameters[CAM_DIM * j + 5];
 
                         f[0] = m_parameters[CAM_DIM * j + 6];
                         f[1] = m_parameters[CAM_DIM * j + 7];
                         f[2] = m_parameters[CAM_DIM * j + 8];
+
+                        framesToAdjust[idx]->setPose(pose_temp);
                     }
                   return true;
                 }

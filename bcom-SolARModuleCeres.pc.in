@@ -1,9 +1,9 @@
-libname=SolARModuleNonFreeOpenCV
+libname=SolARModuleCeres
 prefix=/usr/local
 exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/interfaces
-Name: SolARModuleNonFreeOpenCV
+Name: SolARModuleCeres
 Description:
 Version: 0.4.0
 Requires:
