@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define USE_FREE
+#define USE_FREE
 
 
 #include <iostream>
@@ -117,22 +117,28 @@ void basic_mapFiltering( std::vector<SRef<CloudPoint>>&in, double thresh, double
 }
 int run_bundle(){
 
+
     // stream config need data folder (ask for it).
     std::string path_stream = "stream_config.txt";
     streamConfig* mStream = new streamConfig();
     mStream->load(path_stream);
     LOG_ADD_LOG_TO_CONSOLE();
 
-    /* instantiate component manager*/
-    /* this is needed in dynamic mode */
+
     SRef<xpcf::IComponentManager> xpcfComponentManager = xpcf::getComponentManagerInstance();
+
+
     if(xpcfComponentManager->load("bundle_config.xml")!=org::bcom::xpcf::_SUCCESS)
     {
         LOG_ERROR("Failed to load the configuration file bundle_config.xml")
         return -1;
     }
     LOG_INFO("Start creating components");
+    std::cout<<" loading components.."<<std::endl;
+
     auto camera =xpcfComponentManager->create<SolARCameraOpencv>()->bindTo<input::devices::ICamera>();
+
+
 #ifdef USE_FREE
     auto keypointsDetector =xpcfComponentManager->create<SolARKeypointDetectorOpencv>()->bindTo<features::IKeypointDetector>();
     auto descriptorExtractor =xpcfComponentManager->create<SolARDescriptorsExtractorAKAZE2Opencv>()->bindTo<features::IDescriptorsExtractor>();
@@ -146,7 +152,12 @@ int run_bundle(){
     auto mapper =xpcfComponentManager->create<SolARSVDTriangulationOpencv>()->bindTo<solver::map::ITriangulator>();
     auto poseGraph =xpcfComponentManager->create<SolARMapper>()->bindTo<solver::map::IMapper>();
     auto viewer3DPoints =xpcfComponentManager->create<SolAR3DPointsViewerOpengl>()->bindTo<display::I3DPointsViewer>();
+
+
+    LOG_INFO("********************loading bundle: ");
+
     auto bundler =xpcfComponentManager->create<SolARBundlerCeres>()->bindTo<api::solver::map::IBundler>();
+    LOG_INFO("********************loaded: ");
 
     auto  mapFilter =xpcfComponentManager->create<SolARMapFilter>()->bindTo<solver::map::IMapFilter>();
 
@@ -172,9 +183,10 @@ int run_bundle(){
         SolAROpenCVHelper::convertToSolar(cvView, views[i]);
     }
     std::cout<<c <<"/"<<mStream->m_viewsNo<<" loaded correctly"<<std::endl;
-
-
     keyframePoses.resize(2);
+
+
+
     poseFinderFrom2D2D->setCameraParameters(camera->getIntrinsicsParameters(), camera->getDistorsionParameters());
     mapper->setCameraParameters(camera->getIntrinsicsParameters(), camera->getDistorsionParameters());
 
@@ -202,6 +214,18 @@ int run_bundle(){
     LOG_INFO("Estimate pose of the camera for the frame 2: \n {}", keyframePoses[1].matrix());
 
     // Triangulate
+
+    keyframe[0] = xpcf::utils::make_shared<Keyframe>(keypoints[0],
+                                                     descriptors[0],
+                                                     views[0],
+                                                     keyframePoses[0]);
+
+    poseGraph->update(map, keyframe[0]);
+
+    SRef<Frame> frame2 = xpcf::utils::make_shared<Frame>(keypoints[1], descriptors[1], views[1], keyframe[0]);
+
+    frame2->setPose(keyframePoses[1]);
+
     double reproj_error = mapper->triangulate(keypoints[0],
                                               keypoints[1],
                                               matches,
@@ -211,21 +235,18 @@ int run_bundle(){
                                               cloud);
 
 
-    for(unsigned int v = 0; v < 2; ++v){
-        keyframe[v] = xpcf::utils::make_shared<Keyframe>(keypoints[v],
-                                                         descriptors[v],
-                                                         views[v],
-                                                         keyframePoses[v]);
-    }
+
+
 
     mapFilter->filter(keyframePoses[0], keyframePoses[1], cloud, filtredCloud);
 
 
-    poseGraph->update(map, keyframe[0]);
+    keyframe[1] = xpcf::utils::make_shared<Keyframe>(frame2);
+
     poseGraph->update(map,
-                       keyframe[1],
-                       filtredCloud,
-                       matches);
+                      keyframe[1],
+                      filtredCloud,
+                      matches);
 
 
     std::vector<int>selectedKeyframes = {0,1};
@@ -236,11 +257,13 @@ int run_bundle(){
     cloud_before_ba = *poseGraph->getMap()->getPointCloud();
 
     std::vector<SRef<Keyframe>> kf=poseGraph->getKeyframes();
+
     bundler->adjustBundle(kf,
                           *poseGraph->getMap()->getPointCloud(),
                           camera->getIntrinsicsParameters(),
                           camera->getDistorsionParameters(),
                           selectedKeyframes);
+
 
 
 
@@ -262,6 +285,8 @@ int run_bundle(){
 
     // here the drawing cameras!
 
+    /*
+
     while(true){
         if (viewer3DPoints->displayCloudsAndPoses(cloud_before_ba,
                                                   cloud_after_ba,
@@ -272,11 +297,25 @@ int run_bundle(){
             return 0;
         }
     }
+    */
+
+    while(true){
+        if (viewer3DPoints->displayClouds(cloud_before_ba,
+                                          cloud_after_ba,
+                                          color_noba,
+                                          color_withba) == FrameworkReturnCode::_STOP){
+            return 0;
+        }
+    }
+
 
     return 0;
 }
 int main(){
-  run_bundle();
+    cv::namedWindow("debug window", 0);
+    std::cout<<" just before bundle.."<<std::endl;
+    run_bundle();
+    cv::waitKey(0);
   return 0;
 }
 
