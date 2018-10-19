@@ -20,7 +20,7 @@
 
 namespace xpcf=org::bcom::xpcf;
 
-XPCF_DECLARE_MODULE("22a1243c-4aa1-49a6-990b-cbab4d0785f1", "SolARModuleCeres")
+XPCF_DECLARE_MODULE("09f4a367-c5bf-4a9f-9f3b-42424d52f717", "SolARModuleCeres")
 
 extern "C" XPCF_MODULEHOOKS_API xpcf::XPCFErrorCode XPCF_getComponent(const boost::uuids::uuid& componentUUID,SRef<xpcf::IComponentIntrospect>& interfaceRef)
 {

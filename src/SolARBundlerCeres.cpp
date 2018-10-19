@@ -1,10 +1,16 @@
-#include "SolARBundlerCeres.h"
 
+#include "SolARBundlerCeres.h"
 #include <cmath>
 #include <cstdio>
 #include <iostream>
 #include <fstream>
 #include <utility>
+#include <string>
+
+
+#define POINT_DIM 3
+#define CAM_DIM 9
+#define OBSERV_DIM 2
 
 
 
@@ -19,6 +25,7 @@ namespace SolAR {
     using namespace datastructure;
         namespace MODULES {
             namespace CERES {
+
 
                 struct SnavelyReprojectionError {
                     SnavelyReprojectionError(double observed_x, double observed_y)
@@ -85,28 +92,14 @@ namespace SolAR {
                     };
                 };
 
+
+
                 SolARBundlerCeres::SolARBundlerCeres():ComponentBase(xpcf::toUUID<SolARBundlerCeres>())
                 {
-                    std::cout<<"##########################ADDING INTERFACES"<<std::endl;
                      addInterface<IBundler>(this);
-                #ifdef DEBUG
-                    std::cout << " SolARBundlerCeres constructor" << std::endl;
-                #endif
+                     LOG_DEBUG(" SolARBundlerCeres constructor");
                 }
 
-
-
-
-                void SolARBundlerCeres::initCeresProblem(){
-                    m_options.linear_solver_type = ceres::ITERATIVE_SCHUR;
-                    m_options.preconditioner_type = ceres::SCHUR_JACOBI;
-                    m_options.dense_linear_algebra_library_type = ceres::LAPACK;
-                    m_options.max_num_iterations = 20;
-                    m_options.num_threads = 1;
-                    m_options.num_linear_solver_threads = 1;
-                    m_options.logging_type = ceres::SILENT;
-
-                }
 
                 bool SolARBundlerCeres::adjustBundle(std::vector<SRef<Keyframe>>&framesToAdjust,
                                                      std::vector<SRef<CloudPoint>>&mapToAdjust,
@@ -129,8 +122,15 @@ namespace SolAR {
                                        selectKeyframes);
                     return true;
                 }
-
-
+                void SolARBundlerCeres::initCeresProblem(){                    
+                    m_options.linear_solver_type = ceres::ITERATIVE_SCHUR;
+                    m_options.preconditioner_type = ceres::SCHUR_JACOBI;
+                    m_options.dense_linear_algebra_library_type = ceres::LAPACK;
+                    m_options.max_num_iterations = 20;
+                    m_options.num_threads = 1;
+                    m_options.num_linear_solver_threads = 1;
+                    m_options.logging_type = ceres::SILENT;
+                }
                 void SolARBundlerCeres::fillCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                                                          std::vector<SRef<CloudPoint>>&mapToAdjust,
                                                          const CamCalibration &K,
@@ -240,22 +240,26 @@ namespace SolAR {
                     }
 
                 }
-
                 bool SolARBundlerCeres::solveCeresProblem(){
                     for (int i = 0; i < num_observations(); ++i) {
                         ceres::CostFunction* cost_function =
                             SnavelyReprojectionError::Create(m_observations[OBSERV_DIM * i + 0],
                                                              m_observations[OBSERV_DIM * i + 1]);
 
+
                         m_problem.AddResidualBlock(cost_function,
-                                                 NULL /* squared loss */,
+                                                 NULL ,
                                                  mutable_camera_for_observation(i),
                                                  mutable_point_for_observation(i));
                     }
 
-                    ceres::Solver::Summary summary;
-                    ceres::Solve(m_options, &m_problem, &summary);
-                    std::cout << summary.FullReport() << "\n";
+
+
+
+
+                    ceres::Solve(m_options, &m_problem, &m_summary);
+                    std::cout << m_summary.FullReport() << "\n";
+
                     return true;
                 }
 

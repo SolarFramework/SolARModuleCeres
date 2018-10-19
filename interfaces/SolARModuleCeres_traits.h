@@ -13,7 +13,7 @@ class SolARBundlerCeres;
 }
 
 XPCF_DEFINE_COMPONENT_TRAITS(SolAR::MODULES::CERES::SolARBundlerCeres,
-                             "e317076a-8776-4763-9c0b-96fe6edeea30",
+                             "4897fc13-682c-4e95-8aba-abd9f7a17193",
                              "SolAR::MODULES::CERES::SolARBundlerCeres")
 
 #endif // SOLARMODULECERES_TRAITS_H

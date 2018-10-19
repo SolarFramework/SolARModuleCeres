@@ -3,8 +3,7 @@
 
 
 #include "api/solver/map/IBundler.h"
-#include "xpcf/component/ComponentBase.h"
-#include <vector>
+#include "xpcf/component/ConfigurableBase.h"
 #include "SolARCeresAPI.h"
 
 #include "ceres/ceres.h"
@@ -12,13 +11,7 @@
 
 
 
-
-#include <string>
-
-#define POINT_DIM 3
-#define CAM_DIM 9
-#define OBSERV_DIM 2
-
+namespace xpcf  = org::bcom::xpcf;
 
 namespace SolAR {
     using namespace datastructure;
@@ -30,6 +23,8 @@ namespace SolAR {
                 SolARBundlerCeres();
                 ~SolARBundlerCeres() = default;
 
+                  void unloadComponent () override final;
+
 
                bool adjustBundle(std::vector<SRef<Keyframe>>&framesToAdjust,
                                  std::vector<SRef<CloudPoint>>&mapToAdjust,
@@ -38,9 +33,8 @@ namespace SolAR {
                                  const std::vector<int>&selectKeyframes) override final;
 
 
-                void unloadComponent () override final;
-
             private :
+
 
 
                 void initCeresProblem();
@@ -112,7 +106,7 @@ namespace SolAR {
 
                     } else {
                         double a = (fabs(sth) < small) ? 1 : th/sin(th) ;
-                        double b ;
+                    //    double b ;
                         r(0) = 0.5*a*(R(2,1) - R(1,2)) ;
                         r(1) = 0.5*a*(R(0,2) - R(2,0)) ;
                         r(2) = 0.5*a*(R(1,0) - R(0,1)) ;
@@ -210,6 +204,7 @@ namespace SolAR {
 
                 ceres::Problem m_problem;
                 ceres::Solver::Options m_options;
+                ceres::Solver::Summary m_summary;
 
                 double m_pHeight;
                 double m_pWidth;
@@ -222,6 +217,8 @@ namespace SolAR {
                 int* m_cameraIndex;
                 double* m_observations;
                 double* m_parameters;
+
+
             };
         }
     }
