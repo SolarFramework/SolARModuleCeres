@@ -9,6 +9,12 @@
 #include "ceres/ceres.h"
 #include "ceres/rotation.h"
 
+#define POINT_DIM 3
+#define OBSERV_DIM 2
+#define CAM_DIM 15
+#define EXT_DIM 6
+#define INT_DIM 9
+
 
 
 namespace xpcf  = org::bcom::xpcf;
@@ -184,21 +190,35 @@ namespace SolAR {
                     return m_parameters;
                 }
                 double* mutable_points() {
-                    return m_parameters + 9 * m_camerasNo;
+                    return m_parameters + (INT_DIM + EXT_DIM) * m_camerasNo;
+                }
+
+
+                double* mutable_intrinsic() {
+                    return m_parameters + (EXT_DIM) * m_camerasNo;
+                }
+
+
+                double * mutable_extrinsic_for_observation(int i) {
+                    return mutable_cameras() + m_extrinsicIndex[i] * EXT_DIM;
+                }
+
+                double * mutable_intrinsic_for_observation(int i) {
+                    return mutable_intrinsic() + m_intrinsicIndex[i] * INT_DIM;
                 }
 
                 double* mutable_camera_for_observation(int i) {
-                    return mutable_cameras() + m_cameraIndex[i] * 9;
+                    return mutable_cameras() + m_cameraIndex[i] * CAM_DIM;
                 }
                 double* mutable_point_for_observation(int i) {
-                    return mutable_points() + m_pointIndex[i] * 3;
+                    return mutable_points() + m_pointIndex[i] * POINT_DIM;
                 }
 
                 template<typename T>
                 void FscanfOrDie(FILE *fptr, const char *format, T *value) {
                     int num_scanned = fscanf(fptr, format, value);
                     if (num_scanned != 1) {
-                       std::cerr << "Invalid UW data file."<<std::endl;
+                        std::cerr << "Invalid UW data file." << std::endl;
                     }
                 }
 
@@ -213,8 +233,14 @@ namespace SolAR {
                 int m_pointsNo;
                 int m_observationsNo;
                 int m_parametersNo;
+
                 int* m_pointIndex;
                 int* m_cameraIndex;
+
+                int * m_extrinsicIndex;
+                int * m_intrinsicIndex;
+
+
                 double* m_observations;
                 double* m_parameters;
 

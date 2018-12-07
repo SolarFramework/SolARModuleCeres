@@ -61,3 +61,10 @@ x64*
 
 tests/SolARHomographyEstimation/xpcf_custom\.xml
 
+build-SolARTestModuleCeres-R/pose1.txt
+build-SolARTestModuleCeres-R/pose0.txt
+build-SolARTestModuleCeres-R/kp0.txt
+build-SolARTestModuleCeres-R/D.txt
+build-SolARTestModuleCeres-R/K.txt
+build-SolARTestModuleCeres-R/kp1.txt
+build-SolARTestModuleCeres-R/cloud.txt

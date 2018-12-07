@@ -37,177 +37,230 @@ namespace xpcf = org::bcom::xpcf;
 
 
 struct SolARBALoader{
-    std::vector<SRef<Keyframe>>m_keyframes;
-    std::vector<std::vector<SRef<Keypoint>>>m_kps;
-    std::vector<Transform3Df> m_poses;
-    std::vector<SRef<Image>> m_views; // empty no need for bundle problem
-    std::vector<SRef<DescriptorBuffer>> m_descriptors;  // empty no need for bundle problem
-    CamCalibration m_intrinsics;
-    CamDistortion m_distorsion;
-    std::vector<SRef<CloudPoint>>m_cloud;
-    const int m_keyframesNo  = 2;
+    std::vector<std::vector<SRef<Keypoint>>>m_measurements;
+	std::vector<Transform3Df>m_poses;
+    std::vector<SRef<CloudPoint>>m_observations;
+    std::vector<SRef<Image>> m_views;
+    std::vector<SRef<DescriptorBuffer>> m_descriptors;
+	CamCalibration  m_intrinsic;
+	CamDistortion   m_distorsion;
 
-    bool parse_keypoints(std::string&path, std::vector<SRef<Keypoint>>&kp, bool verbose){
-        std::cout<<" loading keypoints: "<<std::endl;
-        int kp_no;
-        std::ifstream ox(path);
-        if(ox.is_open()){
-            ox>>kp_no;
-            kp.resize(kp_no);
-            for(int i = 0; i < kp_no; ++i){
-              float x; ox>>x;
-              float y; ox>>y;
-              kp[i] = xpcf::utils::make_shared<Keypoint>(x,y,0.0,0.0,0.0,0.0,0);
-              if(verbose){
-                  std::cout<<"x: "<<x<<" y: "<<y<<std::endl;
-              }
-            }
+    bool loadMeasurements(const std::string & path_measures) {
+        int N;
+        std::ifstream ox(path_measures);
+        if (!ox.is_open()) {
+            std::cerr << " can't read measurmeents file from: " << path_measures << std::endl;
+            return false;
         }
-        else{
-            LOG_INFO("can't read kp file from",path);
-           return false;
-        }
-        std::cout<<"done"<<std::endl;
-        return true;
-    }
-    bool parse_extrinsic(std::string&path, Transform3Df& pose, bool verbose){
-        std::cout<<" loading pose: "<<std::endl;
-        std::ifstream ox(path);
-        if(ox.is_open()){
-           for(int i = 0; i < 4; ++i){
-                for(int j = 0; j < 4; ++j){
-                    ox>>pose(i,j);
-                    if(verbose)
-                        std::cout<<pose(i,j)<<" ";
+        else {
+            std::cout<<" loading measurement: ";
+            ox >> N;
+            m_measurements.resize(N);
+            for (int i = 0; i < N; ++i) {
+                std::cout<<i<<" ";
+                std::string path_measure;
+                ox >> path_measure;
+                std::ifstream ox(path_measure);
+                if (!ox.is_open()) {
+                    std::cerr << " can't find observation file from: " << path_measure << std::endl;
+                    return false;
                 }
-                if(verbose)
-                    std::cout<<std::endl;
+                else {
+                    int kp_no;
+                    ox >> kp_no;
+                    m_measurements[i].resize(kp_no);
+                    for (int j = 0; j < kp_no; ++j) {
+                        float x,y;
+                        ox >>x;
+                        ox >>y;
+                        m_measurements[i][j] = xpcf::utils::make_shared<Keypoint>(x,y,0.0,0.0,0.0,0.0,0);
+                    }
+                }   
             }
+            std::cout<<" done"<<std::endl;
+            return true;
+        }
+    }
+    bool loadObservations(const std::string & path_obs) {
+        std::ifstream ox(path_obs);
+        if (!ox.is_open()) {
+            std::cerr << "can't find cloud from: " << path_obs << std::endl;
+            return false;
         }
         else{
-            LOG_INFO("can't read pose file from",path);
-           return false;
-        }
-        std::cout<<"done"<<std::endl;
-        return true;
-    }
+            std::cout<<" loading observations: ";
+            int obs_no;
+            ox >> obs_no;
+            m_observations.resize(obs_no);    
+            for (int i = 0; i < obs_no; ++i) {
+                double x,y,z;
+                ox >> x;
+                ox >> y;
+                ox >> z;
 
-    bool parse_intrinsic(std::string&path, CamCalibration& K, bool verbose){
-        std::cout<<"loading intrinsics: "<<std::endl;
-        std::ifstream ox(path);
+                std::map<unsigned int, unsigned int> visibility_temp;
+
+               m_observations[i] = xpcf::utils::make_shared<CloudPoint>(x, y, z,0.0,0.0,0.0,0.0,visibility_temp);
+               int viz_no; ox >> viz_no;
+               for(int j = 0; j < viz_no; ++j) {
+                   int idxView,idxLoc;
+                    ox >>idxView;
+                    ox >>idxLoc;
+                    m_observations[i]->getVisibility()[idxView] = idxLoc;
+                }
+            }
+            std::cout<<" done"<<std::endl;
+        }
+        return true;
+        
+    }
+    
+    bool loadIntrinsic(const std::string&path_calib){
+        std::cout<<"loading intrinsics: ";
+        std::ifstream ox(path_calib);
         if(ox.is_open()){
            for(int i = 0; i < 3; ++i){
                 for(int j = 0; j < 3; ++j){
-                    ox>>K(i,j);
-                    if(verbose)
-                        std::cout<<K(i,j)<<" ";
+                    ox>>m_intrinsic(i,j);
                 }
-                if(verbose)
-                    std::cout<<std::endl;
             }
+           std::cout<<"done"<<std::endl;
         }
         else{
-            LOG_INFO("can't read K file from",path);
+            LOG_INFO("can't read calirabtion file from", path_calib);
            return false;
         }
-        std::cout<<"done"<<std::endl;
         return true;
     }
-    bool parse_distorsion(std::string&path, CamDistortion& D, bool verbose){
-        std::cout<<"loading distorsion: "<<std::endl;
-        std::ifstream ox(path);
-        if(ox.is_open()){
-           for(int i = 0; i < 5; ++i){
-                ox>>D(i);
-                if(verbose)
-                    std::cout<<D(i)<<" ";
-            }
-        }
-        else{
-            LOG_INFO("can't read D file from",path);
-           return false;
-        }
-        std::cout<<"done"<<std::endl;
-        return true;
-    }
-    bool parse_map(std::string &path, std::vector<SRef<CloudPoint>>&cloud, bool verbose){
-        std::cout<<"loading cloud: "<<std::endl;
-        int points_no;
-        std::ifstream ox(path);
-        if(ox.is_open()){
-            ox>>points_no;
-            cloud.resize(points_no);
-            for(int i = 0; i < points_no; ++i){
-              double x; ox>>x;
-              double y; ox>>y;
-              double z; ox>>z;
-              std::map<unsigned int, unsigned int> visibility;
-              for(int v = 0; v < 2; ++v){
-                  int id; ox>>id;
-                  visibility[v] = id;
-              }
-              cloud[i] = xpcf::utils::make_shared<CloudPoint>(x,y,z,0.0,0.0,0.0,0.0, visibility);
-              if(verbose){
-                  std::cout<<"x: "<<cloud[i]->getX()<<" y: "<<cloud[i]->getY()<<" z: "<<cloud[i]->getZ()<<std::endl;
-                  for (std::map<unsigned int, unsigned int>::iterator it = cloud[i]->getVisibility().begin(); it !=cloud[i]->getVisibility().end(); ++it){
-                      std::cout<<it->second<<" ";
-                  }
-                  std::cout<<std::endl;
-              }
-            }
-        }
-        else{
-            LOG_INFO("can't read kp file from",path);
-           return false;
-        }
-        std::cout<<"done"<<std::endl;
-        return true;
-    }
-    bool load(std::vector<std::string>&paths){
-        if(paths.size()!=7){
-            std::cerr<<" can't init ba problem, paths must be equal to 7"<<std::endl;
+    bool loadDistorsions(const std::string&path_dist) {
+        std::ifstream ox(path_dist);
+        if (!ox.is_open()) {
+            LOG_INFO("can't read distorsion file from", path_dist);
             return false;
-        }else{
-            m_poses.resize(m_keyframesNo); m_kps.resize(m_keyframesNo); m_keyframes.resize(m_keyframesNo);
-            m_descriptors.resize(m_keyframesNo); m_views.resize(m_keyframesNo);
-            parse_keypoints(paths[0], m_kps[0], false);
-            parse_keypoints(paths[1], m_kps[1], false);
-
-            parse_extrinsic(paths[2], m_poses[0], false);
-            parse_extrinsic(paths[3], m_poses[1], false);
-
-            parse_intrinsic(paths[4], m_intrinsics, false);
-            parse_distorsion(paths[5], m_distorsion, false);
-            parse_map(paths[6], m_cloud, false);
-
-            // fill keyframes (warning   if m_keyframeNo > 2, update correctly datas).
-            for(unsigned int c = 0; c < m_keyframesNo; ++c){
-                m_keyframes[c] = xpcf::utils::make_shared<Keyframe>(m_kps[c],
-                                                                    m_descriptors[c],
-                                                                    m_views[c],
-                                                                    m_poses[c]);
+        }
+        else {
+            std::cout<<"loading intrinsic: ";
+                for (int i = 0; i < 5; ++i) {
+                    ox >> m_distorsion[i];
             }
+                std::cout<<" done"<<std::endl;
         }
         return true;
     }
+
+    bool loadPoses(const std::string & path_poses) {
+        std::ifstream ox(path_poses);
+        if (!ox.is_open()) {
+            std::cerr << "can't find poses file from: " << path_poses << std::endl;
+            return false;
+        }
+        else{
+            std::cout<<" loading poses: ";
+            int N;
+            ox >> N;
+            m_poses.resize(N);
+            for (unsigned int i = 0; i < N; ++i) {
+                for (int ii = 0; ii < 3; ++ii) {
+                    for (int jj = 0; jj < 4; ++jj) {
+                        ox >> m_poses[i](ii, jj);
+                    }
+                }
+                m_poses[i](3,0) = 0.0;m_poses[i](3,1) = 0.0;m_poses[i](3,2) = 0.0;m_poses[i](3,3) = 1.0;
+            }
+        }
+        std::cout<<" done"<<std::endl;
+        return true;
+    }
+    
+    void showPoses()const {
+        int idx = 0;
+        for (const auto &p : m_poses) {
+            std::cout << " pose: " << idx << std::endl;
+            for (int i = 0; i < 3; ++i) {
+                for (int j = 0; j < 4; ++j) {
+                    std::cout << p(i, j) << " ";
+                }
+                std::cout << std::endl;
+            }
+            ++idx;
+            std::cout << std::endl;
+        }
+    }
+    
+    void showObservations()const {
+        int idx = 0;
+        std::cout << "<cloud>: " << std::endl;
+        std::cout<<"    ->size: "<<m_observations.size()<<std::endl;
+        for (unsigned int i = 0; i < m_observations.size(); ++i){
+            std::cout << "p: " << m_observations[i]->getX() << " " <<  m_observations[i]->getY() << " " <<  m_observations[i]->getZ() << "  ";
+
+            std::map<unsigned int, unsigned int> visibility = m_observations[i]->getVisibility();
+            int idxFrame = 0;
+            for (std::map<unsigned int, unsigned int>::iterator it = visibility.begin(); it != visibility.end(); ++it){
+                std::cout<<it->first<<" "<<it->second<<" ";
+            }
+            std::cout << std::endl;
+        }
+        std::cout << std::endl;
+    }
+    
+    void showMeasurements()const {
+        std::cout << "<Measurements>: " << std::endl;
+        for (int i = 0; i < m_measurements.size(); ++i) {
+            std::cout << "	<Measurement: " << i << ">:" << std::endl;
+            for (int j = 0; j < m_measurements[i].size(); ++j) {
+                std::cout << m_measurements[i][j]->getX() << " " <<  m_measurements[i][j]->getY() << std::endl;
+            }
+        }
+    }
+    
+    void  showIntrinsics()const {
+        std::cout << "<Intrinsics>: " << std::endl;
+            for (int ii = 0; ii < 3; ++ii) {
+                for (int jj = 0; jj < 3; ++jj) {
+                    std::cout << m_intrinsic(ii, jj) << " ";
+                }
+                std::cout << std::endl;
+            }
+    }
+    
+    void  showDistorsions()const {
+        std::cout << "<distorsions>: " << std::endl;
+            for (int ii = 0; ii < 5; ++ii) {
+                    std::cout << m_distorsion[ii] << " ";
+            }
+            std::cout << std::endl;
+    }
+    
 };
 
-int run_bundle(){
+int run_bundle(std::string & scene){
     LOG_ADD_LOG_TO_CONSOLE();
     SolARBALoader *ba = new SolARBALoader();
-    std::vector<std::string> paths; paths.resize(7);
 
-    paths[0] = "kp0.txt";
-    paths[1] = "kp1.txt";
-    paths[2] = "pose0.txt";
-    paths[3] = "pose1.txt";
-    paths[4] = "K.txt";
-    paths[5] =  "D.txt";
-    paths[6] = "cloud.txt";
+//    std::string scene = "room6";
+    
+    const std::string path_poses        = "../" + scene + "Bundle/" + scene + "Poses.txt";
+    const std::string path_obsrvations  = "../" + scene + "Bundle/" + scene + "Observations.txt";;
+    const std::string path_measurements = "../" + scene + "Bundle/" + scene + "Measurements.txt";
+    const std::string path_calibration  = "../" + scene + "Bundle/" + scene + "Calibration.txt";
+    const std::string path_distorison   = "../" + scene + "Bundle/" + scene + "Distorsion.txt";
+
+    /// Loading ba problem
+    ba->loadObservations(path_obsrvations);
+    ba->loadMeasurements(path_measurements);
+    ba->loadPoses(path_poses);
+    ba->loadIntrinsic(path_calibration);
+    ba->loadDistorsions(path_distorison);
+    /// showing ba problem
+//    ba->showObservations();
+//    ba->showMeasurements();
+    ba->showPoses();
+//    ba->showIntrinsics();
+
 
 
     LOG_INFO("-<SolARBALOADER LOADING>-");
-    ba->load(paths);
     SRef<xpcf::IComponentManager> xpcfComponentManager = xpcf::getComponentManagerInstance();
     if(xpcfComponentManager->load("bundle_config.xml")!=org::bcom::xpcf::_SUCCESS)
     {
@@ -220,43 +273,71 @@ int run_bundle(){
     LOG_INFO("-<SolAR3DPointsViewerOpengl LOADING>-");
     auto viewer3DPoints =xpcfComponentManager->create<SolAR3DPointsViewerOpengl>()->bindTo<display::I3DPointsViewer>();
 
-    std::vector<int>selectedKeyframes = {0,1};
-    std::vector<SRef<CloudPoint>>cloud_before = ba->m_cloud;
-    std::vector<Transform3Df>poses_before;
-    poses_before.resize(2);
-    poses_before[0] = ba->m_keyframes[0]->getPose();
-    poses_before[1] = ba->m_keyframes[1]->getPose();
+    ba->showDistorsions();
 
-    bundler->adjustBundle(ba->m_keyframes,
-                          ba->m_cloud,
-                          ba->m_intrinsics,
+    std::vector<SRef<Keyframe>>keyframes;
+    keyframes.resize(ba->m_poses.size());
+    ba->m_descriptors.resize(ba->m_poses.size());
+    ba->m_views.resize(ba->m_poses.size());
+
+    for(unsigned int i = 0; i < keyframes.size(); ++i){
+       keyframes[i] = xpcf::utils::make_shared<Keyframe>(ba->m_measurements[i],
+                                                         ba->m_descriptors[i],
+                                                         ba->m_views[i],
+                                                         ba->m_poses[i]);
+
+
+    }
+
+
+    std::vector<int>selectedKeyframes;// = {0,1};
+    std::vector<SRef<CloudPoint>>cloud, cloud_ba;
+    std::vector<Transform3Df>poses , poses_ba;
+    for(unsigned i = 0; i < keyframes.size(); ++i){
+        Transform3Df tt = keyframes[i]->getPose();
+        poses.push_back(tt);
+    }
+
+    cloud = ba->m_observations;
+
+    bundler->adjustBundle(keyframes,
+                          ba->m_observations,
+                          ba->m_intrinsic,
                           ba->m_distorsion,
                           selectedKeyframes);
 
-    std::vector<SRef<CloudPoint>>cloud_after = ba->m_cloud;
-    std::vector<Transform3Df>poses_after;
-    poses_after.resize(2);
-    poses_after[0] = ba->m_keyframes[0]->getPose();
-    poses_after[1] = ba->m_keyframes[1]->getPose();
+    for(auto & p: keyframes){
+        Transform3Df tt = p->getPose();
+        poses_ba.push_back(tt);
+    }
 
+    cloud_ba = ba->m_observations;
 
     std::vector<Transform3Df>framePoses;
     Transform3Df pp = Transform3Df::Identity();
     while(true){
-        if (viewer3DPoints->display(cloud_before,
+        if (viewer3DPoints->display(cloud,
                                     pp,
-                                    poses_before,
+                                    poses,
                                     framePoses,
-                                    cloud_after,
-                                    poses_after) == FrameworkReturnCode::_STOP){
+                                    cloud_ba,
+                                    poses_ba) == FrameworkReturnCode::_STOP){
                 return 0;
             }
         }
+
+
     delete ba;
     return 0;
 }
-int main(){
-    run_bundle();
+int main(int argc, char ** argv){
+    if(argc != 2){
+        std::cerr<<" ERROR! number of arguments is incorrect, exit.."<<std::endl;
+        return -1;
+    }
+    std::string scene_name = argv[1];
+    run_bundle(scene_name);
+
   return 0;
 }
 
