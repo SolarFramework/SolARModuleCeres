@@ -95,13 +95,6 @@ namespace SolAR {
                     const T& p1 = cameraIntr[7];
                     const T& p2 = cameraIntr[8];
 
-                    //T r2 = xp * xp + yp * yp;
-                    //T r4 = r2 * r2;
-                    //T distortion = 1.0 + r2 * (k1 + k2 * r2 + k3 * r2 * r2);
-
-
-                    //T predicted_x = fx * distortion * xp;
-                    //T predicted_y = fy * distortion * yp;
 
                     T predicted_x, predicted_y;
                     // apply distortion to the normalized points to get (xd, yd)
@@ -149,48 +142,71 @@ namespace SolAR {
 
 
 
-                SolARBundlerCeres::SolARBundlerCeres():ComponentBase(xpcf::toUUID<SolARBundlerCeres>())
+                SolARBundlerCeres::SolARBundlerCeres():ConfigurableBase(xpcf::toUUID<SolARBundlerCeres>())
                 {
                      addInterface<IBundler>(this);
+                     SRef<xpcf::IPropertyMap> params = getPropertyRootNode();
+
+                     params->wrapUnsignedInteger("iterationsCount", m_iterationsNo);
+                     params->wrapUnsignedInteger("fixedMap", m_fixedMap);
+                     params->wrapUnsignedInteger("fixedExtrinsics", m_fixedExtrinsics);
+                     params->wrapUnsignedInteger("fixedIntrinsics", m_fixedIntrinsics);
+                     params->wrapUnsignedInteger("holdFirstPose", m_holdFirstPose);
                      LOG_DEBUG(" SolARBundlerCeres constructor");
                 }
 
+                /*
+                xpcf::XPCFErrorCode SolARBundlerCeres::onConfigured(){
 
-                bool SolARBundlerCeres::adjustBundle(std::vector<SRef<Keyframe>>&framesToAdjust,
-                                                     std::vector<SRef<CloudPoint>>&mapToAdjust,
-                                                     const CamCalibration &K,
-                                                     const CamDistortion &D,
-                                                     const std::vector<int>&selectKeyframes){
-                    std::cout<<"0->init ceres problem"<<std::endl;
+                }*/
+
+                double SolARBundlerCeres::solve(std::vector<SRef<Keyframe>>&framesToAdjust,
+                                                std::vector<SRef<CloudPoint>>&mapToAdjust,
+                                                CamCalibration &K,
+                                                CamDistortion &D,
+                                                const std::vector<int>&selectKeyframes){
+                    LOG_INFO("0. INIT CERES PROBLEM");
                     initCeresProblem();
-                    std::cout<<"1->fill ceres problem"<<std::endl;
-                    fillCeresProblem(framesToAdjust,
+
+                    LOG_INFO("ITERATIONS NO: {}", m_iterationsNo);
+                    LOG_INFO("MAP FIXED ? {}", m_fixedMap);
+                    LOG_INFO("EXTRINSICS FIXED ? {}", m_fixedExtrinsics);
+                    LOG_INFO("INTRINSICS FIXED ? {}", m_fixedIntrinsics);
+                    LOG_INFO("HOLD FIRST POSE ? {}", m_holdFirstPose);
+
+                    LOG_INFO("1. FILL CERES PROBLEM");
+                  fillCeresProblem(framesToAdjust,
                                      mapToAdjust,
                                      K,
                                      D,
                                      selectKeyframes);
 
-                    std::cout<<"2->apply ceres problem"<<std::endl;
-                    solveCeresProblem();
-                    std::cout<<"3->update ceres problem"<<std::endl;
+                    LOG_INFO("2. SOLVE CERES PROBLEM");
+                    double reproj_error = 0.f;
+                    reproj_error = solveCeresProblem();
+
+                    LOG_INFO("reproj error inside sole: {}", reproj_error);
+                    LOG_INFO("3. UPDATE CERES PROBLEM");
                     updateCeresProblem(framesToAdjust,
                                        mapToAdjust,
+                                       K,
+                                       D,
                                        selectKeyframes);
-                    return true;
+                    return reproj_error;
                 }
                 void SolARBundlerCeres::initCeresProblem(){                    
                     m_options.use_nonmonotonic_steps = true;
                     m_options.preconditioner_type = ceres::SCHUR_JACOBI;
                     m_options.linear_solver_type = ceres::ITERATIVE_SCHUR;
                     m_options.use_inner_iterations = true;
-                    m_options.max_num_iterations = 100;
+                    m_options.max_num_iterations = m_iterationsNo;
                     m_options.minimizer_progress_to_stdout = false;
 
                 }
                 void SolARBundlerCeres::fillCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                                                          std::vector<SRef<CloudPoint>>&mapToAdjust,
-                                                         const CamCalibration &K,
-                                                         const CamDistortion &D,
+                                                         CamCalibration &K,
+                                                         CamDistortion &D,
                                                          const std::vector<int>&selectedKeyframes){
 
 
@@ -201,7 +217,7 @@ namespace SolAR {
                     }
                     std::vector<ceresObserv>observations_temp;
                     if(global_bundling){
-                        std::cout<<" global bundler "<<std::endl;
+                       LOG_DEBUG("#### GLOBAL BUNDLER");
                         for(int i = 0; i < mapToAdjust.size(); ++i){
                             std::map<unsigned int, unsigned int> visibility = mapToAdjust[i]->getVisibility();
                             int idxFrame = 0;
@@ -223,11 +239,7 @@ namespace SolAR {
                         }
                     }
                     else{
-                        std::cout<<" local bundler: { ";
-                        for(int ii = 0; ii < selectedKeyframes.size(); ++ii)
-                            std::cout<<selectedKeyframes[ii]<<" ";
-                        std::cout<<"}"<<std::endl;
-
+                        LOG_DEBUG("#### LOCAL BUNDLER");
                         for(int i = 0; i < mapToAdjust.size(); ++i){
                             std::map<unsigned int, unsigned int> visibility = mapToAdjust[i]->getVisibility();
                             int idxFrame = 0;
@@ -252,7 +264,6 @@ namespace SolAR {
                     m_camerasNo      = framesToAdjust.size();
                     m_pointsNo       = mapToAdjust.size();
 
-                    std::cout << "    1.1->obs: " << m_observationsNo << " cams: " << m_camerasNo << std::endl;
                     m_observations = new double[OBSERV_DIM * m_observationsNo];
 
                     m_pointIndex     = new int[m_observationsNo];
@@ -262,7 +273,6 @@ namespace SolAR {
                     m_parametersNo = (EXT_DIM + INT_DIM) * m_camerasNo + POINT_DIM * m_pointsNo;
                     m_parameters = new double[m_parametersNo];
 
-                    std::cout << "    1.2->filling observation: " << std::endl;
                     for (int i = 0; i < m_observationsNo; ++i) {
                         m_extrinsicIndex[i] = observations_temp[i].cIdx;
                         m_intrinsicIndex[i] = observations_temp[i].cIdx;
@@ -272,7 +282,6 @@ namespace SolAR {
                         m_observations[OBSERV_DIM*i + 1] = observations_temp[i].oPt.getY();
 
                     }
-                    std::cout<<"    1.3->filling parameters (cam): "<<std::endl;
 
                     for(int  i = 0; i < m_camerasNo; ++i){
 
@@ -300,15 +309,22 @@ namespace SolAR {
                             m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 0] = K(0, 0);
                             m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 1] = K(1, 1);
                             m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 2] = K(0, 2);
-                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 3] = K(1, 2);
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 3] = K(1, 2);                            
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 4] = D(0);
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 5] = D(1);
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 6] = D(2);
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 7] = D(3);
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 8] = D(4);
 
+/*
                             m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 4] = 0.0;
                             m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 5] = 0.0;
                             m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 6] = 0.0;
                             m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 7] = 0.0;
-                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 8] = 0.0;
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 8] = 0.0;*/
+
+
                     }
-                    std::cout<<"    1.4->filling parameters (points): "<<std::endl;
 
                     for(int i = 0; i < mapToAdjust.size(); ++i){
                         m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 0] = mapToAdjust[i]->getX();
@@ -316,17 +332,8 @@ namespace SolAR {
                         m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 2] = mapToAdjust[i]->getZ();
                     }
 
-                    std::ofstream oxEXT("D:/solar_EXTRINSIC.txt");
-                    for (int i = 0; i < num_observations(); ++i) {
-                        for(int ii = 0; ii < 6; ++ii){
-                            oxEXT<<mutable_extrinsic_for_observation(i)[ii]<<" ";
-                        }
-                        oxEXT<<std::endl;
-                    }
-                    oxEXT.close();
-
                 }
-                bool SolARBundlerCeres::solveCeresProblem(){
+                double SolARBundlerCeres::solveCeresProblem(){
 
                     for (int i = 0; i < num_observations(); ++i) {
                             ceres::CostFunction* cost_function = SolARReprojectionError::create(m_observations[OBSERV_DIM * i + 0],
@@ -336,24 +343,37 @@ namespace SolAR {
                                                                             mutable_extrinsic_for_observation(i),
                                                                             mutable_point_for_observation(i));
 
-                            if (mutable_extrinsic_for_observation(i)[3] == 0 && mutable_extrinsic_for_observation(i)[4] == 0) {
-                                m_problem.SetParameterBlockConstant(mutable_extrinsic_for_observation(i));
+                            /*
+                            if(m_holdFirstPose && !m_fixedExtrinsics){
+                                if (mutable_extrinsic_for_observation(i)[3] == 0 && mutable_extrinsic_for_observation(i)[4] == 0) {
+                                    m_problem.SetParameterBlockConstant(mutable_extrinsic_for_observation(i));
 
-                            }
-
+                                }
+                            }*/
                     }
-                    for (int i = 0; i < m_camerasNo; ++i)
-                            m_problem.SetParameterBlockConstant(mutable_intrinsic_for_observation(i));
 
+                    if(m_fixedExtrinsics){
+                       for (int i = 0; i < m_camerasNo; ++i)
+                          m_problem.SetParameterBlockConstant(mutable_extrinsic_for_observation(i));
+                    }else if(m_holdFirstPose){
+                          m_problem.SetParameterBlockConstant(mutable_extrinsic_for_observation(0));
+                    }
+                    if(m_fixedIntrinsics){
+                        for (int i = 0; i < m_camerasNo; ++i)
+                                m_problem.SetParameterBlockConstant(mutable_intrinsic_for_observation(i));
+                    }
+                    if(m_fixedMap){
+                        for (int i = 0; i <num_observations(); ++i)
+                                m_problem.SetParameterBlockConstant(mutable_point_for_observation(i));
+                    }
 
                     ceres::Solve(m_options, &m_problem, &m_summary);
                     std::cout << m_summary.FullReport() << "\n";
-
-                    return true;
+                    return ((double)m_summary.final_cost/(double)m_pointsNo);
                 }
 
 
-                bool SolARBundlerCeres::updateMap(std::vector<SRef<CloudPoint>>&mapToAdjust){
+                void SolARBundlerCeres::updateMap(std::vector<SRef<CloudPoint>>&mapToAdjust){
                     for (int j = 0; j < get_points(); ++j) {
                         double x = m_parameters[(j * 3 + 0) + ((EXT_DIM + INT_DIM) * get_cameras())];
                         double y = m_parameters[(j * 3 + 1) + ((EXT_DIM + INT_DIM) * get_cameras())];
@@ -362,10 +382,8 @@ namespace SolAR {
                         std::map<unsigned int, unsigned int>visibility = mapToAdjust[j]->getVisibility();
                         mapToAdjust[j] = xpcf::utils::make_shared<CloudPoint>(x, y, z,0.0,0.0,0.0,reprj_err,visibility);
                     }
-
-                    return true;
                 }
-                bool SolARBundlerCeres::updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust,
+                void SolARBundlerCeres::updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust,
                                                         const std::vector<int>&selectedKeyframes){
                     for (int j = 0; j < framesToAdjust.size(); ++j) {
                         Vector3d r,t, f;
@@ -391,19 +409,32 @@ namespace SolAR {
                         framesToAdjust[j]->setPose(pose_temp);
 
                     }
-                  return true;
                 }
-                bool SolARBundlerCeres::updateIntrinsic(std::vector<SRef<Keyframe>>&framesToAdjust){
-                    // do some stuff !
-                    return true;
+                void SolARBundlerCeres::updateIntrinsic(CamCalibration &Knew,CamDistortion &Dnew){
+
+                    int idx = 0;
+                    Knew(0, 0)  = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 0];
+                    Knew(1, 1)  = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 1];
+                    Knew(0, 2)  = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 2];
+                    Knew(1, 2)  = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 3];
+
+                    Dnew(0)     = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 4];
+                    Dnew(1)     = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 5];
+                    Dnew(2)     = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 6];
+                    Dnew(3)     = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 7];
+                    Dnew(4)     = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 8];
                 }
-                bool SolARBundlerCeres::updateCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
+                void SolARBundlerCeres::updateCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                                                            std::vector<SRef<CloudPoint>>&mapToAdjust,
+                                                           CamCalibration &K,
+                                                           CamDistortion &D,
                                                            const std::vector<int>&selectedKeyframes){
-                    updateMap(mapToAdjust);
-                    updateExtrinsic(framesToAdjust,selectedKeyframes);
-                    updateIntrinsic(framesToAdjust);
-                    return true;
+                    if(!m_fixedMap)
+                       updateMap(mapToAdjust);
+                    if(!m_fixedExtrinsics)
+                        updateExtrinsic(framesToAdjust,selectedKeyframes);
+                    if(!m_fixedIntrinsics)
+                        updateIntrinsic(K,D);
                 }
             }
        }

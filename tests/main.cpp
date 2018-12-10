@@ -233,18 +233,26 @@ struct SolARBALoader{
     }
     
 };
-
 int run_bundle(std::string & scene){
     LOG_ADD_LOG_TO_CONSOLE();
     SolARBALoader *ba = new SolARBALoader();
 
 //    std::string scene = "room6";
-    
+    std::string path_dir = "D:/AmineSolar/source/ba/SolARModuleCeres/";
+    /*
     const std::string path_poses        = "../" + scene + "Bundle/" + scene + "Poses.txt";
     const std::string path_obsrvations  = "../" + scene + "Bundle/" + scene + "Observations.txt";;
     const std::string path_measurements = "../" + scene + "Bundle/" + scene + "Measurements.txt";
     const std::string path_calibration  = "../" + scene + "Bundle/" + scene + "Calibration.txt";
-    const std::string path_distorison   = "../" + scene + "Bundle/" + scene + "Distorsion.txt";
+    const std::string path_distorison   = "../" + scene + "Bundle/" + scene + "Distorsion.txt";*/
+
+
+    const std::string path_poses        = path_dir + scene + "Bundle/" + scene + "Poses.txt";
+    const std::string path_obsrvations  = path_dir + scene + "Bundle/" + scene + "Observations.txt";;
+    const std::string path_measurements = path_dir + scene + "Bundle/" + scene + "Measurements.txt";
+    const std::string path_calibration  = path_dir + scene + "Bundle/" + scene + "Calibration.txt";
+    const std::string path_distorison   = path_dir + scene + "Bundle/" + scene + "Distorsion.txt";
+
 
     /// Loading ba problem
     ba->loadObservations(path_obsrvations);
@@ -298,14 +306,26 @@ int run_bundle(std::string & scene){
         poses.push_back(tt);
     }
 
-    cloud = ba->m_observations;
+   cloud = ba->m_observations;
+   double reproj_errorFinal  = 0.f;
 
-    bundler->adjustBundle(keyframes,
-                          ba->m_observations,
-                          ba->m_intrinsic,
-                          ba->m_distorsion,
-                          selectedKeyframes);
 
+   LOG_INFO("-<before bundle>-");
+   LOG_INFO("   -> K: {}",ba->m_intrinsic.matrix());
+   LOG_INFO("   -> D: {}",ba->m_distorsion.matrix());
+
+
+   reproj_errorFinal = bundler->solve(keyframes,
+                                      ba->m_observations,
+                                      ba->m_intrinsic,
+                                      ba->m_distorsion,
+                                      selectedKeyframes);
+
+   LOG_INFO("-<after bundle>-");
+   LOG_INFO("   -> K: {}",ba->m_intrinsic.matrix());
+   LOG_INFO("   -> D: {}",ba->m_distorsion.matrix());
+
+   LOG_INFO("reprojection error final: {}",reproj_errorFinal);
     for(auto & p: keyframes){
         Transform3Df tt = p->getPose();
         poses_ba.push_back(tt);
@@ -331,13 +351,15 @@ int run_bundle(std::string & scene){
     return 0;
 }
 int main(int argc, char ** argv){
+    /*
     if(argc != 2){
         std::cerr<<" ERROR! number of arguments is incorrect, exit.."<<std::endl;
         return -1;
     }
-    std::string scene_name = argv[1];
-    run_bundle(scene_name);
+    std::string scene_name = argv[1];*/
 
+    std::string scene_name = "room8";
+    run_bundle(scene_name);
   return 0;
 }
 

@@ -23,20 +23,20 @@ namespace SolAR {
     using namespace datastructure;
     namespace MODULES {
         namespace CERES {
-            class SOLARCERES_EXPORT_API SolARBundlerCeres : public org::bcom::xpcf::ComponentBase,
+            class SOLARCERES_EXPORT_API SolARBundlerCeres : public org::bcom::xpcf::ConfigurableBase,
                 public api::solver::map::IBundler {
             public:
                 SolARBundlerCeres();
                 ~SolARBundlerCeres() = default;
 
-                  void unloadComponent () override final;
+           //     org::bcom::xpcf::XPCFErrorCode onConfigured() override final;
+                void unloadComponent () override final;
 
-
-               bool adjustBundle(std::vector<SRef<Keyframe>>&framesToAdjust,
-                                 std::vector<SRef<CloudPoint>>&mapToAdjust,
-                                 const CamCalibration &K,
-                                 const CamDistortion &D,
-                                 const std::vector<int>&selectKeyframes) override final;
+               double solve(std::vector<SRef<Keyframe>>&framesToAdjust,
+                            std::vector<SRef<CloudPoint>>&mapToAdjust,
+                            CamCalibration &K,
+                            CamDistortion &D,
+                            const std::vector<int>&selectKeyframes) override final;
 
 
             private :
@@ -44,22 +44,24 @@ namespace SolAR {
 
 
                 void initCeresProblem();
-                bool solveCeresProblem();
+                double solveCeresProblem();
                 void fillCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                                       std::vector<SRef<CloudPoint>>&mapToAdjust,
-                                      const CamCalibration &K,
-                                      const CamDistortion &D,
+                                      CamCalibration &K,
+                                      CamDistortion &D,
                                       const std::vector<int>&selectedKeyframes);
 
 
-                bool updateCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
+                void updateCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                                         std::vector<SRef<CloudPoint>>&mapToAdjust,
+                                        CamCalibration &K,
+                                        CamDistortion &D,
                                         const std::vector<int>&selectedKeyframes);
 
-                bool updateMap(std::vector<SRef<CloudPoint>>&mapToAdjust);
-                bool updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust,
+                void updateMap(std::vector<SRef<CloudPoint>>&mapToAdjust);
+                void updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust,
                                      const std::vector<int>&selectedKeyframes);
-                bool updateIntrinsic(std::vector<SRef<Keyframe>>&framesToAdjust);
+                void updateIntrinsic(CamCalibration &K,CamDistortion &D);
 
 
 
@@ -244,7 +246,11 @@ namespace SolAR {
                 double* m_observations;
                 double* m_parameters;
 
-
+                unsigned int m_iterationsNo = 10;
+                unsigned int m_fixedMap = 0;
+                unsigned int m_fixedExtrinsics = 0;
+                unsigned int m_fixedIntrinsics = 1;
+                unsigned int m_holdFirstPose = 1;
             };
         }
     }
