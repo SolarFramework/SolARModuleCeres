@@ -24,18 +24,18 @@ namespace SolAR {
 
             template <typename T>
             inline void SolARRadialDistorsion(const T &focal_length_x,
-                                            const T &focal_length_y,
-                                            const T &principal_point_x,
-                                            const T &principal_point_y,
-                                            const T &k1,
-                                            const T &k2,
-                                            const T &k3,
-                                            const T &p1,
-                                            const T &p2,
-                                            const T &normalized_x,
-                                            const T &normalized_y,
-                                            T *image_x,
-                                            T *image_y)
+                                              const T &focal_length_y,
+                                              const T &principal_point_x,
+                                              const T &principal_point_y,
+                                              const T &k1,
+                                              const T &k2,
+                                              const T &k3,
+                                              const T &p1,
+                                              const T &p2,
+                                              const T &normalized_x,
+                                              const T &normalized_y,
+                                              T *image_x,
+                                              T *image_y)
                                         {
                 T x = normalized_x;
                 T y = normalized_y;
@@ -56,26 +56,19 @@ namespace SolAR {
 
 
             struct SolARReprojectionError {
-                SolARReprojectionError(double observed_x, double observed_y)
-                    : observed_x(observed_x), observed_y(observed_y) {}
-
+                SolARReprojectionError(double observed_x, double observed_y): observed_x(observed_x), observed_y(observed_y) {}
                 template <typename T>
                 bool operator()(const T* const cameraIntr,
                                 const T* const cameraExtr,
                                 const T* const point,
                                 T* residuals) const {
-                    // camera[0,1,2] are the angle-axis rotation.
                     T p[3];
                     ceres::AngleAxisRotatePoint(cameraExtr, point, p);
 
-                    // camera[3,4,5] are the translation.
                     p[0] += cameraExtr[3];
                     p[1] += cameraExtr[4];
                     p[2] += cameraExtr[5];
 
-                    // Compute the center of distortion. The sign change comes from
-                    // the camera model that Noah Snavely's Bundler assumes, whereby
-                    // the camera coordinate system has a negative z axis.
                     T xp = +p[0] / p[2];
                     T yp = +p[1] / p[2];
 
@@ -83,8 +76,6 @@ namespace SolAR {
                     const T& fx = cameraIntr[0];
                     const T& fy = cameraIntr[1];
 
-
-                    // Apply second and fourth order radial distortion.
                     const T& cx = cameraIntr[2];
                     const T& cy = cameraIntr[3];
 
@@ -97,37 +88,29 @@ namespace SolAR {
 
 
                     T predicted_x, predicted_y;
-                    // apply distortion to the normalized points to get (xd, yd)
-                    // do something for zero distortion
                     SolARRadialDistorsion(fx,
-                                        fy,
-                                        cx,
-                                        cy,
-                                        k1, k2, k3,
-                                        p1, p2,
-                                        xp, yp,
-                                        &predicted_x,
-                                        &predicted_y);
+                                          fy,
+                                          cx,
+                                          cy,
+                                          k1, k2, k3,
+                                          p1, p2,
+                                          xp, yp,
+                                          &predicted_x,
+                                          &predicted_y);
 
-                    // The error is the difference between the predicted and observed position.
                     residuals[0] = predicted_x - observed_x;
                     residuals[1] = predicted_y - observed_y;
-
                     return true;
                 }
-
-                // Factory to hide the construction of the CostFunction object from
-                // the client code.
                 static ceres::CostFunction* create(const double observed_x,
                     const double observed_y) {
                     return (new ceres::AutoDiffCostFunction<SolARReprojectionError, 2, 9, 6, 3>(
                         new SolARReprojectionError(observed_x, observed_y)));
                 }
-
                 double observed_x;
                 double observed_y;
             };
-                struct ceresObserv{
+            struct ceresObserv{
                     int cIdx;
                     int pIdx;
                     Point2Df oPt;
@@ -139,9 +122,6 @@ namespace SolAR {
 
                     };
                 };
-
-
-
                 SolARBundlerCeres::SolARBundlerCeres():ConfigurableBase(xpcf::toUUID<SolARBundlerCeres>())
                 {
                      addInterface<IBundler>(this);
@@ -151,14 +131,10 @@ namespace SolAR {
                      params->wrapUnsignedInteger("fixedMap", m_fixedMap);
                      params->wrapUnsignedInteger("fixedExtrinsics", m_fixedExtrinsics);
                      params->wrapUnsignedInteger("fixedIntrinsics", m_fixedIntrinsics);
-                     params->wrapUnsignedInteger("holdFirstPose", m_holdFirstPose);
+                     params->wrapUnsignedInteger("fixedFirstPose", m_holdFirstPose);
                      LOG_DEBUG(" SolARBundlerCeres constructor");
                 }
 
-                /*
-                xpcf::XPCFErrorCode SolARBundlerCeres::onConfigured(){
-
-                }*/
 
                 double SolARBundlerCeres::solve(std::vector<SRef<Keyframe>>&framesToAdjust,
                                                 std::vector<SRef<CloudPoint>>&mapToAdjust,
@@ -168,11 +144,11 @@ namespace SolAR {
                     LOG_INFO("0. INIT CERES PROBLEM");
                     initCeresProblem();
 
-                    LOG_INFO("ITERATIONS NO: {}", m_iterationsNo);
-                    LOG_INFO("MAP FIXED ? {}", m_fixedMap);
-                    LOG_INFO("EXTRINSICS FIXED ? {}", m_fixedExtrinsics);
-                    LOG_INFO("INTRINSICS FIXED ? {}", m_fixedIntrinsics);
-                    LOG_INFO("HOLD FIRST POSE ? {}", m_holdFirstPose);
+                    LOG_DEBUG("ITERATIONS NO: {}", m_iterationsNo);
+                    LOG_DEBUG("MAP FIXED ? {}", m_fixedMap);
+                    LOG_DEBUG("EXTRINSICS FIXED ? {}", m_fixedExtrinsics);
+                    LOG_DEBUG("INTRINSICS FIXED ? {}", m_fixedIntrinsics);
+                    LOG_DEBUG("HOLD FIRST POSE ? {}", m_holdFirstPose);
 
                     LOG_INFO("1. FILL CERES PROBLEM");
                   fillCeresProblem(framesToAdjust,
@@ -197,7 +173,12 @@ namespace SolAR {
                 void SolARBundlerCeres::initCeresProblem(){                    
                     m_options.use_nonmonotonic_steps = true;
                     m_options.preconditioner_type = ceres::SCHUR_JACOBI;
+                    
                     m_options.linear_solver_type = ceres::ITERATIVE_SCHUR;
+                    
+                    m_options.linear_solver_type = ceres::DENSE_SCHUR;
+                    
+                    
                     m_options.use_inner_iterations = true;
                     m_options.max_num_iterations = m_iterationsNo;
                     m_options.minimizer_progress_to_stdout = false;
@@ -300,7 +281,6 @@ namespace SolAR {
                             m_parameters[EXT_DIM*i + 0] = r[0] * fc;
                             m_parameters[EXT_DIM*i + 1] = r[1] * fc;
                             m_parameters[EXT_DIM*i + 2] = r[2] * fc;
-
                             m_parameters[EXT_DIM*i + 3] = t[0];
                             m_parameters[EXT_DIM*i + 4] = t[1];
                             m_parameters[EXT_DIM*i + 5] = t[2];
@@ -315,14 +295,6 @@ namespace SolAR {
                             m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 6] = D(2);
                             m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 7] = D(3);
                             m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 8] = D(4);
-
-/*
-                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 4] = 0.0;
-                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 5] = 0.0;
-                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 6] = 0.0;
-                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 7] = 0.0;
-                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 8] = 0.0;*/
-
 
                     }
 
@@ -342,15 +314,7 @@ namespace SolAR {
                             m_problem.AddResidualBlock(cost_function, NULL, mutable_intrinsic_for_observation(i),
                                                                             mutable_extrinsic_for_observation(i),
                                                                             mutable_point_for_observation(i));
-
-                            /*
-                            if(m_holdFirstPose && !m_fixedExtrinsics){
-                                if (mutable_extrinsic_for_observation(i)[3] == 0 && mutable_extrinsic_for_observation(i)[4] == 0) {
-                                    m_problem.SetParameterBlockConstant(mutable_extrinsic_for_observation(i));
-
-                                }
-                            }*/
-                    }
+                   }
 
                     if(m_fixedExtrinsics){
                        for (int i = 0; i < m_camerasNo; ++i)
