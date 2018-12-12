@@ -44,9 +44,11 @@ namespace SolAR {
                             std::vector<SRef<CloudPoint>>&mapToAdjust,
                             CamCalibration &K,
                             CamDistortion &D,
-                            const std::vector<int>&selectKeyframes) override final;
+                            const std::vector<int>&selectKeyframes) override;
+
 
             private :
+
                /// @brief initialize ceres solver parameters (iterations number, solver type, solver strategy..).
                 void initCeresProblem();
                 /// @brief solve ceres problem using a pre-definded solver parameters: 03 residual blocks are considered
@@ -65,6 +67,8 @@ namespace SolAR {
                                       CamCalibration &K,
                                       CamDistortion &D,
                                       const std::vector<int>&selectedKeyframes);
+
+
                 /// @brief update all ceres problem variables.
                 /// @param[in] framesToAdjust: takes extrinsic parameters correction.
                 /// @param[in] mapToAjust:     takes 3D point correction .
@@ -73,20 +77,23 @@ namespace SolAR {
                 void updateCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                                         std::vector<SRef<CloudPoint>>&mapToAdjust,
                                         CamCalibration &K,
-                                        CamDistortion &D,
-                                        const std::vector<int>&selectedKeyframes);
+                                        CamDistortion &D);
+
+
+
+
+
                 /// @brief update 3D point variable.
                 /// @param[in] mapToAjust:     takes 3D point correction .
                 void updateMap(std::vector<SRef<CloudPoint>>&mapToAdjust);
                 /// @brief update extrinsic parameters variable.
                 /// @param[in] framesToAdjust: takes extrinsic parameters correction.
-                void updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust,
-                                     const std::vector<int>&selectedKeyframes);
+                void updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust);
+
                 /// @brief update intrinsic parameters variable.
                 /// @param[in] K:              takes intrinsic parameters correction.
                 /// @param[in] D:              takes intrinsic parameters correction.
                 void updateIntrinsic(CamCalibration &K,CamDistortion &D);
-
                 /// @brief transform a rotation matrix to axis-anle representation using Rodrigue's formula.
                 /// @param[in]  R:              a pose transform matrix
                 /// @param[out] r:             rodrigues angles
