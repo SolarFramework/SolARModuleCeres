@@ -65,7 +65,7 @@
 			<property name="exitKey" type="Integer" value="27"/>
         </component>
 		<component uuid="4897fc13-682c-4e95-8aba-abd9f7a17193"> <!-- SolARCeresBundle -->
-            <property name="iterationsCount" type="UnsignedInteger" value="50"/>
+            <property name="iterationsCount" type="UnsignedInteger" value="0"/>
 			<property name="fixedMap" type="UnsignedInteger" value="0"/>
 			<property name="fixedExtrinsics" type="UnsignedInteger" value="0"/>
 			<property name="fixedIntrinsics" type="UnsignedInteger" value="1"/>

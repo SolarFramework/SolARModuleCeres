@@ -126,7 +126,6 @@ namespace SolAR {
                 {
                      addInterface<IBundler>(this);
                      SRef<xpcf::IPropertyMap> params = getPropertyRootNode();
-
                      params->wrapUnsignedInteger("iterationsCount", m_iterationsNo);
                      params->wrapUnsignedInteger("fixedMap", m_fixedMap);
                      params->wrapUnsignedInteger("fixedExtrinsics", m_fixedExtrinsics);
@@ -171,6 +170,10 @@ namespace SolAR {
                     m_options.linear_solver_type = ceres::ITERATIVE_SCHUR;                                        
                     m_options.use_inner_iterations = true;
                     m_options.max_num_iterations = m_iterationsNo;
+
+              //      m_options.num_threads = 8;
+              //      m_options.num_linear_solver_threads = 8;
+
                     m_options.minimizer_progress_to_stdout = false;
 
                 }
