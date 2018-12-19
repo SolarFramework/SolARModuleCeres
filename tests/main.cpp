@@ -274,10 +274,12 @@ int run_bundle(std::string & scene){
         return -1;
     }
 
-    LOG_INFO("-<SolARBundlerCeres LOADING>-");
-    auto bundler =xpcfComponentManager->create<SolARBundlerCeres>()->bindTo<api::solver::map::IBundler>();
     LOG_INFO("-<SolAR3DPointsViewerOpengl LOADING>-");
     auto viewer3DPoints =xpcfComponentManager->create<SolAR3DPointsViewerOpengl>()->bindTo<display::I3DPointsViewer>();
+
+    LOG_INFO("-<SolARBundlerCeres LOADING>-");
+    auto bundler =xpcfComponentManager->create<SolARBundlerCeres>()->bindTo<api::solver::map::IBundler>();
+
 
     std::vector<SRef<Keyframe>>keyframes;
     keyframes.resize(ba->m_poses.size());

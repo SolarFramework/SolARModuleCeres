@@ -174,3 +174,8 @@ room15Bundle/room15Pts2D_12.txt
 room15Bundle/room15Pts2D_11.txt
 room15Bundle/room15Pts2D_10.txt
 room15Bundle/room15Pts2D_1.txt
+tests/SolARTestModuleCeres.pro.user.4.8-pre1
+build-SolARTestModuleCeres-D/camera_calibration.yml
+build-SolARTestModuleCeres-D/bundle_config.xml
+build-SolARTestModuleCeres-D/Makefile
+SolARModuleCeres.pro.user.4.8-pre1

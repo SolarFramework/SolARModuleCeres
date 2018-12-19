@@ -40,20 +40,18 @@ namespace SolAR {
                 T x = normalized_x;
                 T y = normalized_y;
 
-                // apply distortion to the normalized points to get (xd, yd)
                 T r2 = x * x + y * y;
                 T r4 = r2 * r2;
                 T r6 = r4 * r2;
+
                 T r_coeff = 1.0 + k1 * r2 + k2 * r4 + k3 * r6;
+
                 T xd = x * r_coeff + 2.0 * p1 * x * y + p2 * (r2 + 2.0 * x * x);
                 T yd = y * r_coeff + 2.0 * p2 * x * y + p1 * (r2 + 2.0 * y * y);
 
-                // apply focal length and principal point to get the final image coordinates
                 *image_x = focal_length_x * xd + principal_point_x;
                 *image_y = focal_length_y * yd + principal_point_y;
             }
-
-
 
             struct SolARReprojectionError {
                 SolARReprojectionError(double observed_x, double observed_y): observed_x(observed_x), observed_y(observed_y) {}
@@ -170,12 +168,7 @@ namespace SolAR {
                     m_options.linear_solver_type = ceres::ITERATIVE_SCHUR;                                        
                     m_options.use_inner_iterations = true;
                     m_options.max_num_iterations = m_iterationsNo;
-
-              //      m_options.num_threads = 8;
-              //      m_options.num_linear_solver_threads = 8;
-
                     m_options.minimizer_progress_to_stdout = false;
-
                 }
                 void SolARBundlerCeres::fillCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                                                          std::vector<SRef<CloudPoint>>&mapToAdjust,
@@ -207,11 +200,6 @@ namespace SolAR {
                                     if(idxCam0 == idxCam1){
                                         int idxPoint = i;
                                         int idxLoc = it->second;
-                                        /*
-                                        std::cout<<" idxPoint: "<<idxPoint<<"  visible in: "<<minViz<<std::endl;
-                                        std::cout<<" idxLoc: "<<idxLoc <<std::endl;
-                                        std::cout<<"idxCam: "<<idxCam0<<std::endl;
-                                        char cc; std::cin>>cc;*/
                                         ceresObserv v;
                                         ++m_observations;
                                         v.oPt  = Point2Df(framesToAdjust[idxCam0]->getKeypoints()[idxLoc]->getX(),
@@ -310,31 +298,13 @@ namespace SolAR {
 
                 }
                 double SolARBundlerCeres::solveCeresProblem(){
-
                     for (int i = 0; i < num_observations(); ++i) {
-                        /*
-                        std::cout<<"observation: "<<std::endl;
-                        std::cout<<m_observations[OBSERV_DIM * i + 0]<<" "<<m_observations[OBSERV_DIM * i + 1]<<std::endl;
-                        std::cout<<"intrinsic: "<<std::endl;
-                        for(int ii = 0; ii < 9; ++ii){
-                            std::cout<<mutable_intrinsic_for_observation(i)[ii]<< " ";
-                        }
-                        std::cout<<std::endl;
-
-                        for(int ii = 0; ii < 6; ++ii){
-                            std::cout<<mutable_extrinsic_for_observation(i)[ii]<< " ";
-                        }
-                        std::cout<<std::endl;
-                        std::cout<<"-------------------"<<std::endl;
-                        char cc; std::cin>>cc;*/
-
                             ceres::CostFunction* cost_function = SolARReprojectionError::create(m_observations[OBSERV_DIM * i + 0],
                                                                                                 m_observations[OBSERV_DIM * i + 1]);
 
                             m_problem.AddResidualBlock(cost_function, NULL, mutable_intrinsic_for_observation(i),
                                                                             mutable_extrinsic_for_observation(i),
                                                                             mutable_point_for_observation(i));
-
                    }
 
                     if(m_fixedExtrinsics){
