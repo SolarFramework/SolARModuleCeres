@@ -1,5 +1,5 @@
 TARGET = SolARTestModuleCeres
-VERSION=0.4.0
+VERSION=0.5.1
 
 CONFIG += c++11
 CONFIG -= qt
