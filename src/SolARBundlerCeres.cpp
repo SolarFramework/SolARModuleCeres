@@ -1,5 +1,6 @@
 
 #include "SolARBundlerCeres.h"
+#include "core/Log.h"
 #include <cmath>
 #include <cstdio>
 #include <iostream>
@@ -138,7 +139,7 @@ namespace SolAR {
                                                 CamCalibration &K,
                                                 CamDistortion &D,
                                                 const std::vector<int>&selectKeyframes){
-                    LOG_INFO("0. INIT CERES PROBLEM");
+                    LOG_DEBUG("0. INIT CERES PROBLEM");
                     double reproj_error = 0.f;
                     initCeresProblem();
                     LOG_DEBUG("ITERATIONS NO: {}", m_iterationsNo);
@@ -146,15 +147,15 @@ namespace SolAR {
                     LOG_DEBUG("EXTRINSICS FIXED ? {}", m_fixedExtrinsics);
                     LOG_DEBUG("INTRINSICS FIXED ? {}", m_fixedIntrinsics);
                     LOG_DEBUG("HOLD FIRST POSE ? {}", m_holdFirstPose);
-                    LOG_INFO("1. FILL CERES PROBLEM");
+                    LOG_DEBUG("1. FILL CERES PROBLEM");
                     fillCeresProblem(framesToAdjust,
                                             mapToAdjust,
                                             K,
                                             D,
                                             selectKeyframes);
-                   LOG_INFO("2. SOLVE CERES PROBLEM");
+                   LOG_DEBUG("2. SOLVE CERES PROBLEM");
                    reproj_error = solveCeresProblem();
-                   LOG_INFO("3. UPDATE  CERES PROBLEM");
+                   LOG_DEBUG("3. UPDATE  CERES PROBLEM");
                    updateCeresProblem(framesToAdjust,
                                       mapToAdjust,
                                       K,
@@ -234,7 +235,7 @@ namespace SolAR {
                         }
                     }
 
-                    LOG_INFO("number of points to bundle:{} ",mapToBundleSize);
+                    LOG_DEBUG("number of points to bundle:{} ",mapToBundleSize);
                     m_observationsNo = observations_temp.size();
                     m_camerasNo      = framesToAdjust.size();
                     m_pointsNo       = mapToAdjust.size();
