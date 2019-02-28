@@ -1,13 +1,15 @@
-#include "SolARBundlerCeres.h"
 
+#include "SolARBundlerCeres.h"
 #include <cmath>
 #include <cstdio>
 #include <iostream>
 #include <fstream>
 #include <utility>
+#include <string>
 
-#include "ceres/ceres.h"
-#include "ceres/rotation.h"
+
+
+
 
 using namespace std;
 namespace xpcf  = org::bcom::xpcf;
@@ -20,227 +22,377 @@ namespace SolAR {
         namespace MODULES {
             namespace CERES {
 
-            class BALProblem {
-            public:
-                ~BALProblem() {
-                    delete[] point_index_;
-                    delete[] camera_index_;
-                    delete[] observations_;
-                    delete[] parameters_;
-                }
-                int num_observations()       const { return num_observations_; }
-                int get_parameters()       const { return num_parameters_;}
-                int get_cameras()       const { return num_cameras_; }
-                int get_points()       const { return num_points_; }
-                const double* observations() const { return observations_; }
-                double* mutable_cameras() { return parameters_; }
-                double* mutable_points() { return parameters_ + 9 * num_cameras_; }
-                double* mutable_camera_for_observation(int i) {
-                    return mutable_cameras() + camera_index_[i] * 9;
-                }
-                double* mutable_point_for_observation(int i) {
-                    return mutable_points() + point_index_[i] * 3;
-                }
-                bool LoadFile(const char* filename) {
-                    FILE* fptr = fopen(filename, "r");
-                    if (fptr == NULL) {
-                        return false;
-                    };
-                    FscanfOrDie(fptr, "%d", &num_cameras_);
-                    FscanfOrDie(fptr, "%d", &num_points_);
-                    FscanfOrDie(fptr, "%d", &num_observations_);
-                    point_index_ = new int[num_observations_];
-                    camera_index_ = new int[num_observations_];
-                    observations_ = new double[2 * num_observations_];
-                    num_parameters_ = 9 * num_cameras_ + 3 * num_points_;
-                    parameters_ = new double[num_parameters_];
-                    for (int i = 0; i < num_observations_; ++i) {
-                        FscanfOrDie(fptr, "%d", camera_index_ + i);
-                        FscanfOrDie(fptr, "%d", point_index_ + i);
-                        for (int j = 0; j < 2; ++j) {
-                            FscanfOrDie(fptr, "%lf", observations_ + 2 * i + j);
-                        }
-                    }
-                    for (int i = 0; i < num_parameters_; ++i) {
-                        FscanfOrDie(fptr, "%lf", parameters_ + i);
-                    }
-                    return true;
-                }
-            private:
-                template<typename T>
-                void FscanfOrDie(FILE *fptr, const char *format, T *value) {
-                    int num_scanned = fscanf(fptr, format, value);
-                    if (num_scanned != 1) {
-                        LOG(FATAL) << "Invalid UW data file.";
-                    }
-                }
-                int num_cameras_;
-                int num_points_;
-                int num_observations_;
-                int num_parameters_;
-                int* point_index_;
-                int* camera_index_;
-                double* observations_;
-                double* parameters_;
-            };
-            // Templated pinhole camera model for used with Ceres.  The camera is
-            // parameterized using 9 parameters: 3 for rotation, 3 for translation, 1 for
-            // focal length and 2 for radial distortion. The principal point is not modeled
-            // (i.e. it is assumed be located at the image center).
-            struct SnavelyReprojectionError {
-                SnavelyReprojectionError(double observed_x, double observed_y)
-                    : observed_x(observed_x), observed_y(observed_y) {}
+            template <typename T>
+            inline void SolARRadialDistorsion(const T &focal_length_x,
+                                              const T &focal_length_y,
+                                              const T &principal_point_x,
+                                              const T &principal_point_y,
+                                              const T &k1,
+                                              const T &k2,
+                                              const T &k3,
+                                              const T &p1,
+                                              const T &p2,
+                                              const T &normalized_x,
+                                              const T &normalized_y,
+                                              T *image_x,
+                                              T *image_y)
+                                        {
+                T x = normalized_x;
+                T y = normalized_y;
+
+                T r2 = x * x + y * y;
+                T r4 = r2 * r2;
+                T r6 = r4 * r2;
+
+                T r_coeff = 1.0 + k1 * r2 + k2 * r4 + k3 * r6;
+
+                T xd = x * r_coeff + 2.0 * p1 * x * y + p2 * (r2 + 2.0 * x * x);
+                T yd = y * r_coeff + 2.0 * p2 * x * y + p1 * (r2 + 2.0 * y * y);
+
+                *image_x = focal_length_x * xd + principal_point_x;
+                *image_y = focal_length_y * yd + principal_point_y;
+            }
+
+            struct SolARReprojectionError {
+                SolARReprojectionError(double observed_x, double observed_y): observed_x(observed_x), observed_y(observed_y) {}
                 template <typename T>
-                bool operator()(const T* const camera,
-                    const T* const point,
-                    T* residuals) const {
-                    // camera[0,1,2] are the angle-axis rotation.
+                bool operator()(const T* const cameraIntr,
+                                const T* const cameraExtr,
+                                const T* const point,
+                                T* residuals) const {
                     T p[3];
-                    ceres::AngleAxisRotatePoint(camera, point, p);
-                    // camera[3,4,5] are the translation.
-                    p[0] += camera[3];
-                    p[1] += camera[4];
-                    p[2] += camera[5];
-                    // Compute the center of distortion. The sign change comes from
-                    // the camera model that Noah Snavely's Bundler assumes, whereby
-                    // the camera coordinate system has a negative z axis.
-                    T xp = -p[0] / p[2];
-                    T yp = -p[1] / p[2];
-                    // Apply second and fourth order radial distortion.
-                    const T& l1 = camera[7];
-                    const T& l2 = camera[8];
-                    T r2 = xp*xp + yp*yp;
-                    T distortion = 1.0 + r2  * (l1 + l2  * r2);
-                    // Compute final projected point position.
-                    const T& focal = camera[6];
-                    T predicted_x = focal * distortion * xp;
-                    T predicted_y = focal * distortion * yp;
-                    // The error is the difference between the predicted and observed position.
+                    ceres::AngleAxisRotatePoint(cameraExtr, point, p);
+
+                    p[0] += cameraExtr[3];
+                    p[1] += cameraExtr[4];
+                    p[2] += cameraExtr[5];
+
+                    T xp = +p[0] / p[2];
+                    T yp = +p[1] / p[2];
+
+
+                    const T& fx = cameraIntr[0];
+                    const T& fy = cameraIntr[1];
+
+                    const T& cx = cameraIntr[2];
+                    const T& cy = cameraIntr[3];
+
+                    const T& k1 = cameraIntr[4];
+                    const T& k2 = cameraIntr[5];
+                    const T& k3 = cameraIntr[6];
+
+                    const T& p1 = cameraIntr[7];
+                    const T& p2 = cameraIntr[8];
+
+
+                    T predicted_x, predicted_y;
+                    SolARRadialDistorsion(fx,
+                                          fy,
+                                          cx,
+                                          cy,
+                                          k1, k2, k3,
+                                          p1, p2,
+                                          xp, yp,
+                                          &predicted_x,
+                                          &predicted_y);
+
                     residuals[0] = predicted_x - observed_x;
                     residuals[1] = predicted_y - observed_y;
                     return true;
                 }
-                // Factory to hide the construction of the CostFunction object from
-                // the client code.
-                static ceres::CostFunction* Create(const double observed_x,
+                static ceres::CostFunction* create(const double observed_x,
                     const double observed_y) {
-                    return (new ceres::AutoDiffCostFunction<SnavelyReprojectionError, 2, 9, 3>(
-                        new SnavelyReprojectionError(observed_x, observed_y)));
+                    return (new ceres::AutoDiffCostFunction<SolARReprojectionError, 2, 9, 6, 3>(
+                        new SolARReprojectionError(observed_x, observed_y)));
                 }
                 double observed_x;
                 double observed_y;
             };
+            struct ceresObserv{
+                    int cIdx;
+                    int pIdx;
+                    Point2Df oPt;
+                    void show(){
+                        std::cout<<" obervation: "<<std::endl;
+                        std::cout<<"    # cam idx: "<<cIdx<<" #3d: "<<pIdx<<" #2d: "<<oPt.getX()<<" "<<oPt.getY()<<std::endl;
+                    }
+                    ceresObserv(){
 
-
-                SolARBundlerCeres::SolARBundlerCeres():ComponentBase(xpcf::toUUID<SolARBundlerCeres>())
+                    };
+                };
+                SolARBundlerCeres::SolARBundlerCeres():ConfigurableBase(xpcf::toUUID<SolARBundlerCeres>())
                 {
                      addInterface<IBundler>(this);
-                #ifdef DEBUG
-                    std::cout << " SolARBundlerCeres constructor" << std::endl;
-                #endif
+                     SRef<xpcf::IPropertyMap> params = getPropertyRootNode();
+                     params->wrapUnsignedInteger("iterationsCount", m_iterationsNo);
+                     params->wrapUnsignedInteger("fixedMap", m_fixedMap);
+                     params->wrapUnsignedInteger("fixedExtrinsics", m_fixedExtrinsics);
+                     params->wrapUnsignedInteger("fixedIntrinsics", m_fixedIntrinsics);
+                     params->wrapUnsignedInteger("fixedFirstPose", m_holdFirstPose);
+                     LOG_DEBUG(" SolARBundlerCeres constructor");
                 }
 
-                bool SolARBundlerCeres::adjustBundle(const std::string&path_bundle,
-                                                     std::vector<SRef<CloudPoint>>& cloud_before,
-                                                     std::vector<SRef<CloudPoint>>& cloud_after){
-                    std::string filename = path_bundle;
-                    BALProblem bal_problem;
-                    if (!bal_problem.LoadFile(filename.c_str())) {
-                        std::cerr << "ERROR: unable to open file " << filename << "\n";
-                        return 1;
+
+                double SolARBundlerCeres::solve(std::vector<SRef<Keyframe>>&framesToAdjust,
+                                                std::vector<SRef<CloudPoint>>&mapToAdjust,
+                                                CamCalibration &K,
+                                                CamDistortion &D,
+                                                const std::vector<int>&selectKeyframes){
+                    LOG_INFO("0. INIT CERES PROBLEM");
+                    double reproj_error = 0.f;
+                    initCeresProblem();
+                    LOG_DEBUG("ITERATIONS NO: {}", m_iterationsNo);
+                    LOG_DEBUG("MAP FIXED ? {}", m_fixedMap);
+                    LOG_DEBUG("EXTRINSICS FIXED ? {}", m_fixedExtrinsics);
+                    LOG_DEBUG("INTRINSICS FIXED ? {}", m_fixedIntrinsics);
+                    LOG_DEBUG("HOLD FIRST POSE ? {}", m_holdFirstPose);
+                    LOG_INFO("1. FILL CERES PROBLEM");
+                    fillCeresProblem(framesToAdjust,
+                                            mapToAdjust,
+                                            K,
+                                            D,
+                                            selectKeyframes);
+                   LOG_INFO("2. SOLVE CERES PROBLEM");
+                   reproj_error = solveCeresProblem();
+                   LOG_INFO("3. UPDATE  CERES PROBLEM");
+                   updateCeresProblem(framesToAdjust,
+                                      mapToAdjust,
+                                      K,
+                                      D);
+                    return reproj_error;
+                }
+
+                void SolARBundlerCeres::initCeresProblem(){
+                    m_options.use_nonmonotonic_steps = true;
+                    m_options.preconditioner_type = ceres::SCHUR_JACOBI;      
+                    m_options.linear_solver_type = ceres::ITERATIVE_SCHUR;                                        
+                    m_options.use_inner_iterations = true;
+                    m_options.max_num_iterations = m_iterationsNo;
+                    m_options.minimizer_progress_to_stdout = false;
+                }
+                void SolARBundlerCeres::fillCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
+                                                         std::vector<SRef<CloudPoint>>&mapToAdjust,
+                                                         CamCalibration &K,
+                                                         CamDistortion &D,
+                                                         const std::vector<int>&selectedKeyframes){
+
+
+
+                    std::vector<ceresObserv>observations_temp;
+                    int mapToBundleSize = 0;
+                    if(selectedKeyframes.size()> 0){
+                        LOG_DEBUG("#### LOCAL BUNDLER");
+                        int minVisibleViews  = 2;
+                        for(int i = 0; i < mapToAdjust.size(); ++i){
+                            std::map<unsigned int, unsigned int> visibility = mapToAdjust[i]->getVisibility();
+                            map<unsigned int, unsigned int>::iterator it;
+                            int minViz = 0;
+                                for (unsigned int c = 0; c < selectedKeyframes.size(); ++c){
+                                    it =  visibility.find(selectedKeyframes[c]);
+                                    if(it!=visibility.end()) ++ minViz;
+                               }
+                            if(minViz<minVisibleViews)continue;
+                            ++ mapToBundleSize;
+                            for (std::map<unsigned int, unsigned int>::iterator it = visibility.begin(); it != visibility.end(); ++it){
+                                int idxCam0 = it->first;
+                                for (unsigned int c = 0; c < selectedKeyframes.size(); ++c){ // seen by at least two cameras...!
+                                    int idxCam1 = selectedKeyframes[c];
+                                    if(idxCam0 == idxCam1){
+                                        int idxPoint = i;
+                                        int idxLoc = it->second;
+                                        ceresObserv v;
+                                        ++m_observations;
+                                        v.oPt  = Point2Df(framesToAdjust[idxCam0]->getKeypoints()[idxLoc]->getX(),
+                                                          framesToAdjust[idxCam0]->getKeypoints()[idxLoc]->getY());
+                                        v.cIdx = idxCam0;
+                                        v.pIdx = idxPoint;
+                                        observations_temp.push_back(v);
+
+                                    }
+                                 }
+                            }
+                        }
                     }
-                    const double* observations = bal_problem.observations();
-                    // Create residuals for each observation in the bundle adjustment problem. The
-                    // parameters for cameras and points are added automatically.
-                    ceres::Problem problem;
-                    for (int i = 0; i < bal_problem.num_observations(); ++i) {
-                        // Each Residual block takes a point and a camera as input and outputs a 2
-                        // dimensional residual. Internally, the cost function stores the observed
-                        // image location and compares the reprojection against the observation.
-                        ceres::CostFunction* cost_function =
-                            SnavelyReprojectionError::Create(observations[2 * i + 0],
-                                observations[2 * i + 1]);
-                        problem.AddResidualBlock(cost_function,
-                            NULL /* squared loss */,
-                            bal_problem.mutable_camera_for_observation(i),
-                            bal_problem.mutable_point_for_observation(i));
-                    }
-                    // Make Ceres automatically detect the bundle structure. Note that the
-                    // standard solver, SPARSE_NORMAL_CHOLESKY, also works fine but it is slower
-                    // for standard bundle adjustment problems.
-                    ceres::Solver::Options options;
-
-                    //options.linear_solver_type = ceres::DENSE_SCHUR;
-                 //   options.minimizer_progress_to_stdout = true;
-
-                    double * parameters = bal_problem.mutable_cameras();
-                    int cameras_no = bal_problem.get_cameras();
-                    int param_no = bal_problem.get_parameters();
-                    int points_no = bal_problem.get_points();
-                    cloud_after.resize(points_no);
-                    cloud_before.resize(points_no);
-
-
-                    int idx0 = 0;
-                    for (int j = 0; j < cameras_no; ++j) {
-                        for (int jj = 0; jj < 9; ++jj) {
-                            ++idx0;
+                    else{
+                        for(int i = 0; i < mapToAdjust.size(); ++i){
+                            std::map<unsigned int, unsigned int> visibility = mapToAdjust[i]->getVisibility();
+                            ++mapToBundleSize;
+                            for (std::map<unsigned int, unsigned int>::iterator it = visibility.begin(); it != visibility.end(); ++it){
+                                if(it->second  != -1){
+                                    ceresObserv v;
+                                    ++m_observations;
+                                    int idxCam = it->first;
+                                    int idxLoc = it->second;
+                                    int idxPoint = i;
+                                    v.oPt  = Point2Df(framesToAdjust[idxCam]->getKeypoints()[idxLoc]->getX(),
+                                                      framesToAdjust[idxCam]->getKeypoints()[idxLoc]->getY());
+                                    v.cIdx = idxCam;
+                                    v.pIdx = idxPoint;
+                                    observations_temp.push_back(v);
+                                }
+                             }
                         }
                     }
 
-                    int idx1 = idx0;
-                    for (int j = 0; j < points_no; ++j) {
-                        double x = parameters[idx1];
-                        ++idx1;
-                       double y = parameters[idx1];
-                        ++idx1;
-                       double z =parameters[idx1];
-                        ++idx1;
-                        double reprj_err = 0;  std::vector<int>visibility = std::vector<int>(50, -1);
-                        cloud_before[j] = xpcf::utils::make_shared<CloudPoint>(x, y, z,0.0,0.0,0.0,reprj_err,visibility);
+                    LOG_INFO("number of points to bundle:{} ",mapToBundleSize);
+                    m_observationsNo = observations_temp.size();
+                    m_camerasNo      = framesToAdjust.size();
+                    m_pointsNo       = mapToAdjust.size();
+
+                    m_observations = new double[OBSERV_DIM * m_observationsNo];
+
+                    m_pointIndex     = new int[m_observationsNo];
+                    m_extrinsicIndex = new int[m_observationsNo];
+                    m_intrinsicIndex = new int[m_observationsNo];
+
+
+                    m_parametersNo = (EXT_DIM + INT_DIM) * m_camerasNo + POINT_DIM * m_pointsNo;
+                    m_parameters = new double[m_parametersNo];
+
+                    for (int i = 0; i < m_observationsNo; ++i) {
+                        m_extrinsicIndex[i] = observations_temp[i].cIdx;
+                        m_intrinsicIndex[i] = observations_temp[i].cIdx;
+                        m_pointIndex[i]     = observations_temp[i].pIdx;
+
+                        m_observations[OBSERV_DIM*i + 0] = observations_temp[i].oPt.getX();
+                        m_observations[OBSERV_DIM*i + 1] = observations_temp[i].oPt.getY();
+
+                    }
+                    for(int  i = 0; i < framesToAdjust.size(); ++i){
+                            Vector3f r, t;
+                            Transform3Df pose_temp = framesToAdjust[i]->getPose();
+
+                            toRodrigues(pose_temp, r);
+
+                            pose_temp = pose_temp.inverse();
+
+                            t[0] = pose_temp(0, 3);
+                            t[1] = pose_temp(1, 3);
+                            t[2] = pose_temp(2, 3);
+
+                            float fc = -1.0;
+                            m_parameters[EXT_DIM*i + 0] = r[0] * fc;
+                            m_parameters[EXT_DIM*i + 1] = r[1] * fc;
+                            m_parameters[EXT_DIM*i + 2] = r[2] * fc;
+                            m_parameters[EXT_DIM*i + 3] = t[0];
+                            m_parameters[EXT_DIM*i + 4] = t[1];
+                            m_parameters[EXT_DIM*i + 5] = t[2];
+
+
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 0] = K(0, 0);
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 1] = K(1, 1);
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 2] = K(0, 2);
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 3] = K(1, 2);                            
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 4] = D(0);
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 5] = D(1);
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 6] = D(2);
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 7] = D(3);
+                            m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 8] = D(4);
+
+                    }
+                    for(int i = 0; i < mapToAdjust.size(); ++i){
+                        m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 0] = mapToAdjust[i]->getX();
+                        m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 1] = mapToAdjust[i]->getY();
+                        m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 2] = mapToAdjust[i]->getZ();
                     }
 
-
-                    options.linear_solver_type = ceres::ITERATIVE_SCHUR;
-                    options.preconditioner_type = ceres::SCHUR_JACOBI;
-                    options.dense_linear_algebra_library_type = ceres::LAPACK;
-                    options.max_num_iterations = 20;
-                    options.num_threads = 8;
-                    options.num_linear_solver_threads = 8;
-                    options.logging_type = ceres::SILENT;
-
-
-                    ceres::Solver::Summary summary;
-                    ceres::Solve(options, &problem, &summary);
-                    std::cout << summary.FullReport() << "\n";
-
-
-
-                    std::cout << " number of parameters: " << param_no << std::endl;
-                    std::cout << " number of cameras: " << cameras_no << std::endl;
-                    std::cout << " number of points: " << points_no << std::endl;
-
-                    double * new_3dpoints = bal_problem.mutable_cameras();
-                    int idx2 = 0;
-                    for (int j = 0; j < cameras_no; ++j) {
-                        for (int jj = 0; jj < 9; ++jj) {
-                            ++idx2;
-                        }
-                    }
-
-                    int idx3 = idx2;
-                    for (int j = 0; j < points_no; ++j) {
-                        double x = new_3dpoints[idx3];
-                        ++idx3;
-                       double y = new_3dpoints[idx3];
-                        ++idx3;
-                       double z = new_3dpoints[idx3];
-                        ++idx3;
-                        double reprj_err = 0;  std::vector<int>visibility = std::vector<int>(50, -1);
-                        cloud_after[j] = xpcf::utils::make_shared<CloudPoint>(x, y, z,0.0,0.0,0.0,reprj_err,visibility);
-                    }
-                    return true;
                 }
+                double SolARBundlerCeres::solveCeresProblem(){
+                    for (int i = 0; i < num_observations(); ++i) {
+                            ceres::CostFunction* cost_function = SolARReprojectionError::create(m_observations[OBSERV_DIM * i + 0],
+                                                                                                m_observations[OBSERV_DIM * i + 1]);
+
+                            m_problem.AddResidualBlock(cost_function, NULL, mutable_intrinsic_for_observation(i),
+                                                                            mutable_extrinsic_for_observation(i),
+                                                                            mutable_point_for_observation(i));
+                   }
+
+                    if(m_fixedExtrinsics){
+                       for (int i = 0; i < m_camerasNo; ++i)
+                          m_problem.SetParameterBlockConstant(mutable_extrinsic_for_observation(i));
+                    }else if(m_holdFirstPose){
+                          m_problem.SetParameterBlockConstant(mutable_extrinsic_for_observation(0));
+                    }
+                    if(m_fixedIntrinsics){
+                        for (int i = 0; i < m_camerasNo; ++i)
+                                m_problem.SetParameterBlockConstant(mutable_intrinsic_for_observation(i));
+                    }
+                    if(m_fixedMap){
+                        for (int i = 0; i <num_observations(); ++i)
+                                m_problem.SetParameterBlockConstant(mutable_point_for_observation(i));
+                    }
+
+                    ceres::Solve(m_options, &m_problem, &m_summary);
+                    std::cout << m_summary.FullReport() << "\n";
+                    return ((double)m_summary.final_cost/(double)m_pointsNo);
+                }
+
+
+                void SolARBundlerCeres::updateMap(std::vector<SRef<CloudPoint>>&mapToAdjust){
+                    for (int j = 0; j < get_points(); ++j) {
+                        double x = m_parameters[(j * 3 + 0) + ((EXT_DIM + INT_DIM) * get_cameras())];
+                        double y = m_parameters[(j * 3 + 1) + ((EXT_DIM + INT_DIM) * get_cameras())];
+                        double z = m_parameters[(j * 3 + 2) + ((EXT_DIM + INT_DIM) * get_cameras())];
+                        double reprj_err = mapToAdjust[j]->getReprojError();
+                        std::map<unsigned int, unsigned int>visibility = mapToAdjust[j]->getVisibility();
+                        mapToAdjust[j] = xpcf::utils::make_shared<CloudPoint>(x, y, z,0.0,0.0,0.0,reprj_err,visibility);
+                    }
+                }
+                void SolARBundlerCeres::updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust){
+                    for (int j = 0; j < m_camerasNo; ++j) {
+                        Vector3d r,t, f;
+                        Transform3Df pose_temp;
+                        r[0] = m_parameters[EXT_DIM * j + 0];
+                        r[1] = m_parameters[EXT_DIM * j + 1];
+                        r[2] = m_parameters[EXT_DIM * j + 2];
+
+                        iRodrigues(r,pose_temp);
+
+                        pose_temp(0,3) = m_parameters[EXT_DIM * j + 3];
+                        pose_temp(1,3) = m_parameters[EXT_DIM * j + 4];
+                        pose_temp(2,3) = m_parameters[EXT_DIM * j + 5];
+
+                        pose_temp(3,0) = 0.0;
+                        pose_temp(3,1) = 0.0;
+                        pose_temp(3,2) = 0.0;
+                        pose_temp(3,3) = 1.0;
+
+
+                       pose_temp = pose_temp.inverse();
+                       framesToAdjust[j]->setPose(pose_temp);
+                    }
+                }
+
+                void SolARBundlerCeres::updateIntrinsic(CamCalibration &Knew,CamDistortion &Dnew){
+
+                    int idx = 0;
+                    Knew(0, 0)  = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 0];
+                    Knew(1, 1)  = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 1];
+                    Knew(0, 2)  = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 2];
+                    Knew(1, 2)  = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 3];
+
+                    Dnew(0)     = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 4];
+                    Dnew(1)     = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 5];
+                    Dnew(2)     = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 6];
+                    Dnew(3)     = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 7];
+                    Dnew(4)     = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 8];
+                }
+
+
+
+
+                void SolARBundlerCeres::updateCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
+                                                           std::vector<SRef<CloudPoint>>&mapToAdjust,
+                                                           CamCalibration &K,
+                                                           CamDistortion &D){
+                    if(!m_fixedMap)
+                       updateMap(mapToAdjust);
+                    if(!m_fixedExtrinsics)
+                        updateExtrinsic(framesToAdjust);
+                    if(!m_fixedIntrinsics)
+                        updateIntrinsic(K,D);
+                }
+
 
             }
        }
