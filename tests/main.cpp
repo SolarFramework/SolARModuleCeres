@@ -27,6 +27,7 @@
 #include "xpcf/xpcf.h"
 #include "api/display/I3DPointsViewer.h"
 #include "api/solver/map/IBundler.h"
+#include "core/Log.h"
 
 using namespace SolAR;
 using namespace SolAR::datastructure;
@@ -57,7 +58,7 @@ struct SolARBALoader{
         int N;
         std::ifstream ox(path_measures);
         if (!ox.is_open()) {
-            std::cerr << " can't read measurmeents file from: " << path_measures << std::endl;
+            std::cerr << " can't read measurements file from: " << path_measures << std::endl;
             return false;
         }
         else {
@@ -246,11 +247,11 @@ struct SolARBALoader{
 int run_bundle(std::string & scene){
     LOG_ADD_LOG_TO_CONSOLE();
     SolARBALoader *ba = new SolARBALoader();
-    const std::string path_poses        = "../" + scene + "Bundle/" + scene + "Poses.txt";
-    const std::string path_points3d     = "../" + scene + "Bundle/" + scene + "Pts3D.txt";;
-    const std::string path_points2d     = "../" + scene + "Bundle/" + scene + "Pts2D.txt";
-    const std::string path_calibration  = "../" + scene + "Bundle/" + scene + "Calibration.txt";
-    const std::string path_distorison   = "../" + scene + "Bundle/" + scene + "Distorsion.txt";
+    const std::string path_poses        = "./" + scene + "Bundle/" + scene + "Poses.txt";
+    const std::string path_points3d     = "./" + scene + "Bundle/" + scene + "Pts3D.txt";;
+    const std::string path_points2d     = "./" + scene + "Bundle/" + scene + "Pts2D.txt";
+    const std::string path_calibration  = "./" + scene + "Bundle/" + scene + "Calibration.txt";
+    const std::string path_distorison   = "./" + scene + "Bundle/" + scene + "Distorsion.txt";
 
     LOG_INFO("-<SolAR BA PROBLEM LOADING>-");
     ba->load3DPoints(path_points3d);
@@ -338,13 +339,6 @@ int run_bundle(std::string & scene){
     return 0;
 }
 int main(int argc, char ** argv){
-    /*
-    if(argc != 2){
-        std::cerr<<" ERROR! number of arguments is incorrect, exit.."<<std::endl;
-        return -1;
-    }
-    std::string scene_name = argv[1];*/
-
     std::string scene_name = "room15";
     run_bundle(scene_name);
     return 0;
