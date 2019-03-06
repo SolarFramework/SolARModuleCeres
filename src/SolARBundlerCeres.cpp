@@ -1,6 +1,6 @@
 
 #include "SolARBundlerCeres.h"
-#include "core/Log.h"
+#include <core/Log.h>
 #include <cmath>
 #include <cstdio>
 #include <iostream>
