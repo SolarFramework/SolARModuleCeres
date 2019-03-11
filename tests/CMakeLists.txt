@@ -26,10 +26,8 @@ set(FILES_TO_COPY
     $ENV{BCOMDEVROOT}/thirdParties/boost/${BOOST_VERSION}/lib/x86_64/shared/${BUILDCONFIG}/${LIBPREFIX}boost_fiber.${LIBEXTENSION}
     $ENV{BCOMDEVROOT}/thirdParties/boost/${BOOST_VERSION}/lib/x86_64/shared/${BUILDCONFIG}/${LIBPREFIX}boost_unit_test_framework.${LIBEXTENSION}
     $ENV{BCOMDEVROOT}/thirdParties/ceres/${CERES_VERSION}/lib/x86_64/shared/${BUILDCONFIG}/${LIBPREFIX}ceres.${LIBEXTENSION}
-    $ENV{BCOMDEVROOT}/thirdParties/glog/${GLOG_VERSION}/lib/x86_64/shared/${BUILDCONFIG}/${LIBPREFIX}glog.${LIBEXTENSION}
-    $ENV{BCOMDEVROOT}/thirdParties/gflags/${GFLAGS_VERSION}/lib/x86_64/shared/${BUILDCONFIG}/${LIBPREFIX}gflags.${LIBEXTENSION}
     $ENV{BCOMDEVROOT}/thirdParties/freeglut/${FREEGLUT_VERSION}/lib/x86_64/shared/${BUILDCONFIG}/${LIBPREFIX}${LIBGLUT}glut.${LIBEXTENSION}
-    $ENV{BCOMDEVROOT}/thirdParties/xpcf/${XPCF_VERSION}lib/x86_64/shared/${BUILDCONFIG}/${LIBPREFIX}xpcf.${LIBEXTENSION}
+    $ENV{BCOMDEVROOT}/thirdParties/xpcf/${XPCF_VERSION}/lib/x86_64/shared/${BUILDCONFIG}/${LIBPREFIX}xpcf.${LIBEXTENSION}
     $ENV{BCOMDEVROOT}/bcomBuild/SolARFramework/${SOLARFRAMEWORK_VERSION}/lib/x86_64/shared/${BUILDCONFIG}/${LIBPREFIX}SolARFramework.${LIBEXTENSION}
 
         )
