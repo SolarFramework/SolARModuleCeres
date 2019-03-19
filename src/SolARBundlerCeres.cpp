@@ -130,6 +130,7 @@ namespace SolAR {
                      params->wrapUnsignedInteger("fixedExtrinsics", m_fixedExtrinsics);
                      params->wrapUnsignedInteger("fixedIntrinsics", m_fixedIntrinsics);
                      params->wrapUnsignedInteger("fixedFirstPose", m_holdFirstPose);
+                     m_parameters=NULL;
                      LOG_DEBUG(" SolARBundlerCeres constructor");
                 }
 
@@ -246,6 +247,8 @@ namespace SolAR {
 
 
                     m_parametersNo = (EXT_DIM + INT_DIM) * m_camerasNo + POINT_DIM * m_pointsNo;
+                    if(!m_parameters)
+                        delete[] m_parameters;
                     m_parameters = new double[m_parametersNo];
 
                     for (int i = 0; i < m_observationsNo; ++i) {
