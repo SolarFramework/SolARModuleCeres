@@ -253,7 +253,7 @@ namespace SolAR {
                 }
 
                 /// @brief ceres problem containing residual blocks.
-                ceres::Problem m_problem;
+//                ceres::Problem m_problem;
                 /// @brief ceres problem options containing solver parameters.
                 ceres::Solver::Options m_options;
                 /// @brief ceres problem summary containing problem minimization evolution.

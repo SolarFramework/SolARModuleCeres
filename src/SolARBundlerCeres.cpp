@@ -297,6 +297,7 @@ namespace SolAR {
 
                 }
                 double SolARBundlerCeres::solveCeresProblem(){
+                    ceres::Problem m_problem;
                     for (int i = 0; i < num_observations(); ++i) {
                             ceres::CostFunction* cost_function = SolARReprojectionError::create(m_observations[OBSERV_DIM * i + 0],
                                                                                                 m_observations[OBSERV_DIM * i + 1]);
