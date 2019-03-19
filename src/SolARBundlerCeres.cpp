@@ -334,9 +334,9 @@ namespace SolAR {
                         double x = m_parameters[(j * 3 + 0) + ((EXT_DIM + INT_DIM) * get_cameras())];
                         double y = m_parameters[(j * 3 + 1) + ((EXT_DIM + INT_DIM) * get_cameras())];
                         double z = m_parameters[(j * 3 + 2) + ((EXT_DIM + INT_DIM) * get_cameras())];
-                        double reprj_err = mapToAdjust[j]->getReprojError();
-                        std::map<unsigned int, unsigned int>visibility = mapToAdjust[j]->getVisibility();
-                        mapToAdjust[j] = xpcf::utils::make_shared<CloudPoint>(x, y, z,0.0,0.0,0.0,reprj_err,visibility);
+                        mapToAdjust[j]->setX(x);
+                        mapToAdjust[j]->setY(y);
+                        mapToAdjust[j]->setZ(z);
                     }
                 }
                 void SolARBundlerCeres::updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust){
