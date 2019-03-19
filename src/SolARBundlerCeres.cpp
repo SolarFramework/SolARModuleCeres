@@ -202,7 +202,6 @@ namespace SolAR {
                                         int idxPoint = i;
                                         int idxLoc = it->second;
                                         ceresObserv v;
-                                        ++m_observations;
                                         v.oPt  = Point2Df(framesToAdjust[idxCam0]->getKeypoints()[idxLoc]->getX(),
                                                           framesToAdjust[idxCam0]->getKeypoints()[idxLoc]->getY());
                                         v.cIdx = idxCam0;
@@ -221,7 +220,6 @@ namespace SolAR {
                             for (std::map<unsigned int, unsigned int>::iterator it = visibility.begin(); it != visibility.end(); ++it){
                                 if(it->second  != -1){
                                     ceresObserv v;
-                                    ++m_observations;
                                     int idxCam = it->first;
                                     int idxLoc = it->second;
                                     int idxPoint = i;
