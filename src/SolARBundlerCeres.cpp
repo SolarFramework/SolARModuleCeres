@@ -80,10 +80,11 @@ namespace SolAR {
 
                     const T& k1 = cameraIntr[4];
                     const T& k2 = cameraIntr[5];
-                    const T& k3 = cameraIntr[6];
 
-                    const T& p1 = cameraIntr[7];
-                    const T& p2 = cameraIntr[8];
+                    const T& p1 = cameraIntr[6];
+                    const T& p2 = cameraIntr[7];
+
+                    const T& k3 = cameraIntr[8];
 
 
                     T predicted_x, predicted_y;
