@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
 <xpcf-registry>	
-	<module uuid="09f4a367-c5bf-4a9f-9f3b-42424d52f717" name="SolARModuleCeres" description="SolARModuleCeres" path="$BCOMDEVROOT/bcomBuild/SolARModuleCeres/0.5.1/lib/x86_64/shared">
+	<module uuid="09f4a367-c5bf-4a9f-9f3b-42424d52f717" name="SolARModuleCeres" description="SolARModuleCeres" path="$BCOMDEVROOT/bcomBuild/SolARModuleCeres/0.5.2/lib/x86_64/shared">
         <component uuid="4897fc13-682c-4e95-8aba-abd9f7a17193" name="SolARBundlerCeres" description="SolARBundlerCeres">
                 <interface uuid="125f2007-1bf9-421d-9367-fbdc1210d006" name="IComponentIntrospect" description="IComponentIntrospect"/>
                 <interface uuid="35b9bdb7-d23c-4909-984f-ae7f9a292e6c" name="IBundler" description="IBundler"/>
         </component>
     </module>
 	
-	 <module uuid="6e960df6-9a36-11e8-9eb6-529269fb1459" name="SolARModuleOpenGL"  description="SolARModuleOpenGL" path="$BCOMDEVROOT/bcomBuild/SolARModuleOpenGL/0.5.1/lib/x86_64/shared">
+	 <module uuid="6e960df6-9a36-11e8-9eb6-529269fb1459" name="SolARModuleOpenGL"  description="SolARModuleOpenGL" path="$BCOMDEVROOT/bcomBuild/SolARModuleOpenGL/0.5.2/lib/x86_64/shared">
         <component uuid="afd38ea0-9a46-11e8-9eb6-529269fb1459" name="SolAR3DPointsViewerOpengl" description="SolAR3DPointsViewerOpengl">
                 <interface uuid="125f2007-1bf9-421d-9367-fbdc1210d006" name="IComponentIntrospect" description="IComponentIntrospect"/>
                 <interface uuid="575d365a-9a27-11e8-9eb6-529269fb1459" name="I3DPointsViewer" description="I3DPointsViewer"/>
