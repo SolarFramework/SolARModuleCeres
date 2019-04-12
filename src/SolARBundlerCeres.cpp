@@ -80,10 +80,11 @@ namespace SolAR {
 
                     const T& k1 = cameraIntr[4];
                     const T& k2 = cameraIntr[5];
-                    const T& k3 = cameraIntr[6];
 
-                    const T& p1 = cameraIntr[7];
-                    const T& p2 = cameraIntr[8];
+                    const T& p1 = cameraIntr[6];
+                    const T& p2 = cameraIntr[7];
+
+                    const T& k3 = cameraIntr[8];
 
 
                     T predicted_x, predicted_y;
@@ -130,6 +131,7 @@ namespace SolAR {
                      params->wrapUnsignedInteger("fixedExtrinsics", m_fixedExtrinsics);
                      params->wrapUnsignedInteger("fixedIntrinsics", m_fixedIntrinsics);
                      params->wrapUnsignedInteger("fixedFirstPose", m_holdFirstPose);
+                     m_parameters=NULL;
                      LOG_DEBUG(" SolARBundlerCeres constructor");
                 }
 
@@ -202,7 +204,6 @@ namespace SolAR {
                                         int idxPoint = i;
                                         int idxLoc = it->second;
                                         ceresObserv v;
-                                        ++m_observations;
                                         v.oPt  = Point2Df(framesToAdjust[idxCam0]->getKeypoints()[idxLoc]->getX(),
                                                           framesToAdjust[idxCam0]->getKeypoints()[idxLoc]->getY());
                                         v.cIdx = idxCam0;
@@ -221,7 +222,6 @@ namespace SolAR {
                             for (std::map<unsigned int, unsigned int>::iterator it = visibility.begin(); it != visibility.end(); ++it){
                                 if(it->second  != -1){
                                     ceresObserv v;
-                                    ++m_observations;
                                     int idxCam = it->first;
                                     int idxLoc = it->second;
                                     int idxPoint = i;
@@ -248,6 +248,8 @@ namespace SolAR {
 
 
                     m_parametersNo = (EXT_DIM + INT_DIM) * m_camerasNo + POINT_DIM * m_pointsNo;
+                    if(!m_parameters)
+                        delete[] m_parameters;
                     m_parameters = new double[m_parametersNo];
 
                     for (int i = 0; i < m_observationsNo; ++i) {
@@ -299,6 +301,7 @@ namespace SolAR {
 
                 }
                 double SolARBundlerCeres::solveCeresProblem(){
+                    ceres::Problem m_problem;
                     for (int i = 0; i < num_observations(); ++i) {
                             ceres::CostFunction* cost_function = SolARReprojectionError::create(m_observations[OBSERV_DIM * i + 0],
                                                                                                 m_observations[OBSERV_DIM * i + 1]);
@@ -337,7 +340,7 @@ namespace SolAR {
                         double reprj_err = mapToAdjust[j]->getReprojError();
                         std::map<unsigned int, unsigned int>visibility = mapToAdjust[j]->getVisibility();
                         mapToAdjust[j] = xpcf::utils::make_shared<CloudPoint>(x, y, z,0.0,0.0,0.0,reprj_err,visibility);
-                    }
+                     }
                 }
                 void SolARBundlerCeres::updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust){
                     for (int j = 0; j < m_camerasNo; ++j) {
