@@ -15,7 +15,7 @@ class SolARBundlerCeres;
 XPCF_DEFINE_COMPONENT_TRAITS(SolAR::MODULES::CERES::SolARBundlerCeres,
                              "4897fc13-682c-4e95-8aba-abd9f7a17193",
                              "SolARBundlerCeres",
-                             "A component for bundle adjustment on a map of 3D points and keyframes")
+                             "Applies a bundle adjustment to optimize a 3D map and keyframes.")
 
 
 #endif // SOLARMODULECERES_TRAITS_H

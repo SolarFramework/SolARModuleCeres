@@ -59,6 +59,10 @@ x64*
 *.TMP
 *.tmp
 
+# documentation
+doc/
+doxygen/
+
 tests/SolARHomographyEstimation/xpcf_custom\.xml
 
 build-SolARTestModuleCeres-R/pose1.txt
