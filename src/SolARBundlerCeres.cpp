@@ -136,8 +136,8 @@ namespace SolAR {
                 }
 
 
-                double SolARBundlerCeres::solve(std::vector<SRef<Keyframe>>&framesToAdjust,
-                                                std::vector<SRef<CloudPoint>>&mapToAdjust,
+                double SolARBundlerCeres::solve(std::vector<SRef<Keyframe>> & framesToAdjust,
+                                                std::vector<CloudPoint> & mapToAdjust,
                                                 CamCalibration &K,
                                                 CamDistortion &D,
                                                 const std::vector<int>&selectKeyframes){
@@ -173,8 +173,8 @@ namespace SolAR {
                     m_options.max_num_iterations = m_iterationsNo;
                     m_options.minimizer_progress_to_stdout = false;
                 }
-                void SolARBundlerCeres::fillCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
-                                                         std::vector<SRef<CloudPoint>>&mapToAdjust,
+                void SolARBundlerCeres::fillCeresProblem(std::vector<SRef<Keyframe>> & framesToAdjust,
+                                                         std::vector<CloudPoint> & mapToAdjust,
                                                          CamCalibration &K,
                                                          CamDistortion &D,
                                                          const std::vector<int>&selectedKeyframes){
@@ -187,7 +187,7 @@ namespace SolAR {
                         LOG_DEBUG("#### LOCAL BUNDLER");
                         int minVisibleViews  = 2;
                         for(int i = 0; i < mapToAdjust.size(); ++i){
-                            std::map<unsigned int, unsigned int> visibility = mapToAdjust[i]->getVisibility();
+                            std::map<unsigned int, unsigned int> visibility = mapToAdjust[i].getVisibility();
                             map<unsigned int, unsigned int>::iterator it;
                             int minViz = 0;
                                 for (unsigned int c = 0; c < selectedKeyframes.size(); ++c){
@@ -204,8 +204,8 @@ namespace SolAR {
                                         int idxPoint = i;
                                         int idxLoc = it->second;
                                         ceresObserv v;
-                                        v.oPt  = Point2Df(framesToAdjust[idxCam0]->getKeypoints()[idxLoc]->getX(),
-                                                          framesToAdjust[idxCam0]->getKeypoints()[idxLoc]->getY());
+                                        v.oPt  = Point2Df(framesToAdjust[idxCam0]->getKeypoints()[idxLoc].getX(),
+                                                          framesToAdjust[idxCam0]->getKeypoints()[idxLoc].getY());
                                         v.cIdx = idxCam0;
                                         v.pIdx = idxPoint;
                                         observations_temp.push_back(v);
@@ -217,7 +217,7 @@ namespace SolAR {
                     }
                     else{
                         for(int i = 0; i < mapToAdjust.size(); ++i){
-                            std::map<unsigned int, unsigned int> visibility = mapToAdjust[i]->getVisibility();
+                            std::map<unsigned int, unsigned int> visibility = mapToAdjust[i].getVisibility();
                             ++mapToBundleSize;
                             for (std::map<unsigned int, unsigned int>::iterator it = visibility.begin(); it != visibility.end(); ++it){
                                 if(it->second  != -1){
@@ -225,8 +225,8 @@ namespace SolAR {
                                     int idxCam = it->first;
                                     int idxLoc = it->second;
                                     int idxPoint = i;
-                                    v.oPt  = Point2Df(framesToAdjust[idxCam]->getKeypoints()[idxLoc]->getX(),
-                                                      framesToAdjust[idxCam]->getKeypoints()[idxLoc]->getY());
+                                    v.oPt  = Point2Df(framesToAdjust[idxCam]->getKeypoints()[idxLoc].getX(),
+                                                      framesToAdjust[idxCam]->getKeypoints()[idxLoc].getY());
                                     v.cIdx = idxCam;
                                     v.pIdx = idxPoint;
                                     observations_temp.push_back(v);
@@ -294,9 +294,9 @@ namespace SolAR {
 
                     }
                     for(int i = 0; i < mapToAdjust.size(); ++i){
-                        m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 0] = mapToAdjust[i]->getX();
-                        m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 1] = mapToAdjust[i]->getY();
-                        m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 2] = mapToAdjust[i]->getZ();
+                        m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 0] = mapToAdjust[i].getX();
+                        m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 1] = mapToAdjust[i].getY();
+                        m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 2] = mapToAdjust[i].getZ();
                     }
 
                 }
@@ -332,14 +332,14 @@ namespace SolAR {
                 }
 
 
-                void SolARBundlerCeres::updateMap(std::vector<SRef<CloudPoint>>&mapToAdjust){
+                void SolARBundlerCeres::updateMap(std::vector<CloudPoint> & mapToAdjust){
                     for (int j = 0; j < get_points(); ++j) {
                         double x = m_parameters[(j * 3 + 0) + ((EXT_DIM + INT_DIM) * get_cameras())];
                         double y = m_parameters[(j * 3 + 1) + ((EXT_DIM + INT_DIM) * get_cameras())];
                         double z = m_parameters[(j * 3 + 2) + ((EXT_DIM + INT_DIM) * get_cameras())];
-                        double reprj_err = mapToAdjust[j]->getReprojError();
-                        std::map<unsigned int, unsigned int>visibility = mapToAdjust[j]->getVisibility();
-                        mapToAdjust[j] = xpcf::utils::make_shared<CloudPoint>(x, y, z,0.0,0.0,0.0,reprj_err,visibility);
+                        double reprj_err = mapToAdjust[j].getReprojError();
+                        std::map<unsigned int, unsigned int>visibility = mapToAdjust[j].getVisibility();
+                        mapToAdjust[j] = CloudPoint(x, y, z,0.0,0.0,0.0,reprj_err,visibility);
                      }
                 }
                 void SolARBundlerCeres::updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust){
@@ -385,8 +385,8 @@ namespace SolAR {
 
 
 
-                void SolARBundlerCeres::updateCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
-                                                           std::vector<SRef<CloudPoint>>&mapToAdjust,
+                void SolARBundlerCeres::updateCeresProblem(std::vector<SRef<Keyframe>> & framesToAdjust,
+                                                           std::vector<CloudPoint> & mapToAdjust,
                                                            CamCalibration &K,
                                                            CamDistortion &D){
                     if(!m_fixedMap)

@@ -48,10 +48,10 @@ public:
     /// K, D represent the camera intrinsic parameters
     /// @param[in] selectKeyframes : selected views to bundle following a given strategies (ex: poseGraph).
     /// @return the mean re-projection error after {pts3d, intrinsic, extrinsic} correction.
-   double solve(std::vector<SRef<Keyframe>>&framesToAdjust,
-                std::vector<SRef<CloudPoint>>&mapToAdjust,
-                CamCalibration &K,
-                CamDistortion &D,
+   double solve(std::vector<SRef<Keyframe>> & framesToAdjust,
+                std::vector<CloudPoint> & mapToAdjust,
+                CamCalibration & K,
+                CamDistortion & D,
                 const std::vector<int>&selectKeyframes) override;
 
 
@@ -71,7 +71,7 @@ private :
     /// @param[in] K:              fills mutable_intrinsic_for_observation buffer.
     /// @param[in] D:              fills mutable_intrinsic_for_observation buffer
     void fillCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
-                          std::vector<SRef<CloudPoint>>&mapToAdjust,
+                          std::vector<CloudPoint> & mapToAdjust,
                           CamCalibration &K,
                           CamDistortion &D,
                           const std::vector<int>&selectedKeyframes);
@@ -83,7 +83,7 @@ private :
     /// @param[in] K:              takes intrinsic parameters correction.
     /// @param[in] D:              takes intrinsic parameters correction.
     void updateCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
-                            std::vector<SRef<CloudPoint>>&mapToAdjust,
+                            std::vector<CloudPoint> & mapToAdjust,
                             CamCalibration &K,
                             CamDistortion &D);
 
@@ -93,10 +93,10 @@ private :
 
     /// @brief update 3D point variable.
     /// @param[in] mapToAjust:     takes 3D point correction .
-    void updateMap(std::vector<SRef<CloudPoint>>&mapToAdjust);
+    void updateMap(std::vector<CloudPoint> & mapToAdjust);
     /// @brief update extrinsic parameters variable.
     /// @param[in] framesToAdjust: takes extrinsic parameters correction.
-    void updateExtrinsic(std::vector<SRef<Keyframe>>&framesToAdjust);
+    void updateExtrinsic(std::vector<SRef<Keyframe>> & framesToAdjust);
 
     /// @brief update intrinsic parameters variable.
     /// @param[in] K:              takes intrinsic parameters correction.
