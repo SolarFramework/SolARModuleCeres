@@ -125,12 +125,11 @@ namespace SolAR {
                 SolARBundlerCeres::SolARBundlerCeres():ConfigurableBase(xpcf::toUUID<SolARBundlerCeres>())
                 {
                      addInterface<IBundler>(this);
-                     SRef<xpcf::IPropertyMap> params = getPropertyRootNode();
-                     params->wrapUnsignedInteger("iterationsCount", m_iterationsNo);
-                     params->wrapUnsignedInteger("fixedMap", m_fixedMap);
-                     params->wrapUnsignedInteger("fixedExtrinsics", m_fixedExtrinsics);
-                     params->wrapUnsignedInteger("fixedIntrinsics", m_fixedIntrinsics);
-                     params->wrapUnsignedInteger("fixedFirstPose", m_holdFirstPose);
+                     declareProperty("iterationsCount", m_iterationsNo);
+                     declareProperty("fixedMap", m_fixedMap);
+                     declareProperty("fixedExtrinsics", m_fixedExtrinsics);
+                     declareProperty("fixedIntrinsics", m_fixedIntrinsics);
+                     declareProperty("fixedFirstPose", m_holdFirstPose);
                      m_parameters=NULL;
                      LOG_DEBUG(" SolARBundlerCeres constructor");
                 }
