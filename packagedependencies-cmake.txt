@@ -1,0 +1,8 @@
+SolARFramework|0.5.2|SolARFramework|bcomBuild|https://github.com/SolarFramework/SolarFramework/releases/download
+xpcf|2.2.0|xpcf|thirdParties|https://github.com/SolarFramework/binaries/releases/download
+boost|1.70.0|boost|thirdParties|https://github.com/SolarFramework/binaries/releases/download
+spdlog|0.14.0|spdlog|thirdParties|https://github.com/SolarFramework/binaries/releases/download
+eigen|3.3.5|eigen|thirdParties|https://github.com/SolarFramework/binaries/releases/download
+ceres|1.14.0|ceres|thirdParties|https://github.com/SolarFramework/binaries/releases/download
+glog|0.3.5|glog|thirdParties|https://github.com/SolarFramework/binaries/releases/download
+gflags|2.2.1|gflags|thirdParties|https://github.com/SolarFramework/binaries/releases/download
