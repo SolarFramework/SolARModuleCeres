@@ -34,10 +34,10 @@ class SOLARCERES_EXPORT_API SolARBundlerCeres : public org::bcom::xpcf::Configur
     public api::solver::map::IBundler {
 public:
     SolARBundlerCeres();
-    ~SolARBundlerCeres() = default;
+    ~SolARBundlerCeres() override = default;
 
 //     org::bcom::xpcf::XPCFErrorCode onConfigured() override final;
-    void unloadComponent () override final;
+    void unloadComponent () final;
 
     /// @brief solve a non-linear problem related to bundle adjustement statement expressed as:
     /// minArg(pts3ds,intrinsics,extrinsics) = MIN_cam_i(MIN_3d_j(pts2d_j - reproje(pt3ds_j,intrinsics_i,extrinsics_i)),
@@ -267,23 +267,23 @@ private :
     /// @brief ceres problem summary containing problem minimization evolution.
     ceres::Solver::Summary m_summary;
     /// @brief number of views.
-    int m_camerasNo;
+    int m_camerasNo{};
     /// @brief number of 3D points.
-    int m_pointsNo;
+    int m_pointsNo{};
      /// @brief number of 2D observations.
-    int m_observationsNo;
+    int m_observationsNo{};
      /// @brief number of residual parameters.
-    int m_parametersNo;
+    int m_parametersNo{};
      /// @brief 3D points indices buffer.
-    int* m_pointIndex;
+    int* m_pointIndex{};
     /// @brief views indices buffer.
-    int* m_cameraIndex;
+    int* m_cameraIndex{};
     /// @brief extrinsic parameters buffer.
-    int * m_extrinsicIndex;
+    int * m_extrinsicIndex{};
     /// @brief intrinsic parameters buffer.
-    int * m_intrinsicIndex;
+    int * m_intrinsicIndex{};
     /// @brief observations buffer.
-    double* m_observations;
+    double* m_observations{};
     /// @brief residual parameters buffer.
     double* m_parameters;
     /// @brief number of mx iterations number.

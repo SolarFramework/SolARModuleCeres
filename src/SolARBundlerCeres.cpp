@@ -38,8 +38,8 @@ namespace SolAR {
                                               T *image_x,
                                               T *image_y)
                                         {
-                T x = normalized_x;
-                T y = normalized_y;
+                const T& x = normalized_x;
+                const T& y = normalized_y;
 
                 T r2 = x * x + y * y;
                 T r4 = r2 * r2;
@@ -111,16 +111,14 @@ namespace SolAR {
                 double observed_y;
             };
             struct ceresObserv{
-                    int cIdx;
-                    int pIdx;
+                    int cIdx{};
+                    int pIdx{};
                     Point2Df oPt;
                     void show(){
                         std::cout<<" obervation: "<<std::endl;
                         std::cout<<"    # cam idx: "<<cIdx<<" #3d: "<<pIdx<<" #2d: "<<oPt.getX()<<" "<<oPt.getY()<<std::endl;
                     }
-                    ceresObserv(){
-
-                    };
+                    ceresObserv()= default;
                 };
                 SolARBundlerCeres::SolARBundlerCeres():ConfigurableBase(xpcf::toUUID<SolARBundlerCeres>())
                 {
@@ -130,7 +128,7 @@ namespace SolAR {
                      declareProperty("fixedExtrinsics", m_fixedExtrinsics);
                      declareProperty("fixedIntrinsics", m_fixedIntrinsics);
                      declareProperty("fixedFirstPose", m_holdFirstPose);
-                     m_parameters=NULL;
+                     m_parameters=nullptr;
                      LOG_DEBUG(" SolARBundlerCeres constructor");
                 }
 
@@ -182,23 +180,22 @@ namespace SolAR {
 
                     std::vector<ceresObserv>observations_temp;
                     int mapToBundleSize = 0;
-                    if(selectedKeyframes.size()> 0){
+                    if(!selectedKeyframes.empty()){
                         LOG_DEBUG("#### LOCAL BUNDLER");
                         int minVisibleViews  = 2;
                         for(int i = 0; i < mapToAdjust.size(); ++i){
                             std::map<unsigned int, unsigned int> visibility = mapToAdjust[i].getVisibility();
                             map<unsigned int, unsigned int>::iterator it;
                             int minViz = 0;
-                                for (unsigned int c = 0; c < selectedKeyframes.size(); ++c){
-                                    it =  visibility.find(selectedKeyframes[c]);
+                                for (int selectedKeyframe : selectedKeyframes){
+                                    it =  visibility.find(selectedKeyframe);
                                     if(it!=visibility.end()) ++ minViz;
                                }
                             if(minViz<minVisibleViews)continue;
                             ++ mapToBundleSize;
-                            for (std::map<unsigned int, unsigned int>::iterator it = visibility.begin(); it != visibility.end(); ++it){
+                            for (auto it = visibility.begin(); it != visibility.end(); ++it){
                                 int idxCam0 = it->first;
-                                for (unsigned int c = 0; c < selectedKeyframes.size(); ++c){ // seen by at least two cameras...!
-                                    int idxCam1 = selectedKeyframes[c];
+                                for (int idxCam1 : selectedKeyframes){ // seen by at least two cameras...!
                                     if(idxCam0 == idxCam1){
                                         int idxPoint = i;
                                         int idxLoc = it->second;
@@ -218,7 +215,7 @@ namespace SolAR {
                         for(int i = 0; i < mapToAdjust.size(); ++i){
                             std::map<unsigned int, unsigned int> visibility = mapToAdjust[i].getVisibility();
                             ++mapToBundleSize;
-                            for (std::map<unsigned int, unsigned int>::iterator it = visibility.begin(); it != visibility.end(); ++it){
+                            for (auto it = visibility.begin(); it != visibility.end(); ++it){
                                 if(it->second  != -1){
                                     ceresObserv v;
                                     int idxCam = it->first;
@@ -305,7 +302,7 @@ namespace SolAR {
                             ceres::CostFunction* cost_function = SolARReprojectionError::create(m_observations[OBSERV_DIM * i + 0],
                                                                                                 m_observations[OBSERV_DIM * i + 1]);
 
-                            m_problem.AddResidualBlock(cost_function, NULL, mutable_intrinsic_for_observation(i),
+                            m_problem.AddResidualBlock(cost_function, nullptr, mutable_intrinsic_for_observation(i),
                                                                             mutable_extrinsic_for_observation(i),
                                                                             mutable_point_for_observation(i));
                    }
