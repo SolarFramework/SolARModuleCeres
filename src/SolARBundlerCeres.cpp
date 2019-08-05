@@ -116,7 +116,7 @@ namespace SolAR {
                     Point2Df oPt;
                     void show(){
                         std::cout<<" obervation: "<<std::endl;
-                        std::cout<<"    # cam idx: "<<cIdx<<" #3d: "<<pIdx<<" #2d: "<<oPt.getX()<<" "<<oPt.getY()<<std::endl;
+                        std::cout<<"    # cam idx: "<<cIdx<<" #3d: "<<pIdx<<" #2d: "<<oPt.x()<<" "<<oPt.y()<<std::endl;
                     }
                     ceresObserv()= default;
                 };
@@ -200,11 +200,11 @@ namespace SolAR {
                                         int idxPoint = i;
                                         int idxLoc = it->second;
                                         ceresObserv v;
-                                        v.oPt  = Point2Df(framesToAdjust[idxCam0]->getKeypoints()[idxLoc].getX(),
-                                                          framesToAdjust[idxCam0]->getKeypoints()[idxLoc].getY());
+                                        v.oPt  = Point2Df(framesToAdjust[idxCam0]->getKeypoints()[idxLoc].x(),
+                                                          framesToAdjust[idxCam0]->getKeypoints()[idxLoc].y());
                                         v.cIdx = idxCam0;
                                         v.pIdx = idxPoint;
-                                        observations_temp.push_back(v);
+                                        observations_temp.emplace_back(v);
 
                                     }
                                  }
@@ -221,11 +221,11 @@ namespace SolAR {
                                     int idxCam = it->first;
                                     int idxLoc = it->second;
                                     int idxPoint = i;
-                                    v.oPt  = Point2Df(framesToAdjust[idxCam]->getKeypoints()[idxLoc].getX(),
-                                                      framesToAdjust[idxCam]->getKeypoints()[idxLoc].getY());
+                                    v.oPt  = Point2Df(framesToAdjust[idxCam]->getKeypoints()[idxLoc].x(),
+                                                      framesToAdjust[idxCam]->getKeypoints()[idxLoc].y());
                                     v.cIdx = idxCam;
                                     v.pIdx = idxPoint;
-                                    observations_temp.push_back(v);
+                                    observations_temp.emplace_back(v);
                                 }
                              }
                         }
@@ -253,8 +253,8 @@ namespace SolAR {
                         m_intrinsicIndex[i] = observations_temp[i].cIdx;
                         m_pointIndex[i]     = observations_temp[i].pIdx;
 
-                        m_observations[OBSERV_DIM*i + 0] = observations_temp[i].oPt.getX();
-                        m_observations[OBSERV_DIM*i + 1] = observations_temp[i].oPt.getY();
+                        m_observations[OBSERV_DIM*i + 0] = observations_temp[i].oPt.x();
+                        m_observations[OBSERV_DIM*i + 1] = observations_temp[i].oPt.y();
 
                     }
                     for(int  i = 0; i < framesToAdjust.size(); ++i){
@@ -290,9 +290,9 @@ namespace SolAR {
 
                     }
                     for(int i = 0; i < mapToAdjust.size(); ++i){
-                        m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 0] = mapToAdjust[i].getX();
-                        m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 1] = mapToAdjust[i].getY();
-                        m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 2] = mapToAdjust[i].getZ();
+                        m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 0] = mapToAdjust[i].x();
+                        m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 1] = mapToAdjust[i].y();
+                        m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM  + INT_DIM) + 2] = mapToAdjust[i].z();
                     }
 
                 }
