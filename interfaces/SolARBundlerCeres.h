@@ -106,7 +106,7 @@ private :
     /// @param[in]  R:              a pose transform matrix
     /// @param[out] r:             rodrigues angles
     /// keeps translation matrix unchanged
-    inline void toRodrigues(Transform3Df &R, Vector3f&r){
+    void toRodrigues(Transform3Df &R, Vector3f&r){
         const double small = 1e-6 ;
         double th = acos
         (0.5*(fmax(R(0,0)+R(1,1)+R(2,2),-1.0) - 1.0)) ;
@@ -165,7 +165,7 @@ private :
     /// @param[in]  r:             Rodrigue's angles
     /// @param[out] R:             rotation matrix
     /// initialize translation matrix to zero
-    inline void iRodrigues(Vector3d &r, Transform3Df&R){
+    void iRodrigues(Vector3d &r, Transform3Df&R){
 
         const double small = 1e-6 ;
 
@@ -216,23 +216,23 @@ private :
     }
 
     /// @return get the number of observations.
-    inline int num_observations()       const {
+    int num_observations()       const {
         return m_observationsNo;
     }
     /// @return get the number of parameters.
-    inline int get_parameters()       const {
+    int get_parameters()       const {
         return m_parametersNo;
     }
     /// @return get the number of views.
-    inline int get_cameras()       const {
+    int get_cameras()       const {
         return m_camerasNo;
     }
     /// @return get the number of points.
-    inline int get_points()       const {
+    int get_points()       const {
         return m_pointsNo;
     }
     /// @return get tall the observations of the problem as a buffer.
-    inline const double* observations() const {
+    const double* observations() const {
         return m_observations;
     }
     /// @return get all the parameters of the problem as a buffer.
