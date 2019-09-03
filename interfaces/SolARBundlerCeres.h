@@ -48,11 +48,25 @@ public:
     /// K, D represent the camera intrinsic parameters
     /// @param[in] selectKeyframes : selected views to bundle following a given strategies (ex: poseGraph).
     /// @return the mean re-projection error after {pts3d, intrinsic, extrinsic} correction.
+	/*
    double solve(std::vector<SRef<Keyframe>> & framesToAdjust,
                 std::vector<CloudPoint> & mapToAdjust,
                 CamCalibration & K,
                 CamDistortion & D,
                 const std::vector<int>&selectKeyframes) override;
+				*/
+
+
+   double solve(const std::vector<SRef<Keyframe>> & framesToAdjust,
+			   const std::vector<CloudPoint> & mapToAdjust,
+			   const  CamCalibration & K,
+			   const CamDistortion & D,
+			   const std::vector<int> & selectKeyframes,
+			   std::vector<SRef<Keyframe>> & framesAdjusted,
+			   std::vector<CloudPoint>&mapAdjusted,
+			   CamCalibration&KAdjusted,
+			   CamDistortion &DAdjusted) override;
+
 
 
 private :
@@ -70,11 +84,19 @@ private :
     /// @param[in] mapToAjust:     fills mutable_point_for_observation buffer .
     /// @param[in] K:              fills mutable_intrinsic_for_observation buffer.
     /// @param[in] D:              fills mutable_intrinsic_for_observation buffer
-    void fillCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
+
+    /*void fillCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
                           std::vector<CloudPoint> & mapToAdjust,
                           CamCalibration &K,
                           CamDistortion &D,
-                          const std::vector<int>&selectedKeyframes);
+                          const std::vector<int>&selectedKeyframes);*/
+
+
+	void fillCeresProblem(const std::vector<SRef<Keyframe>>&framesToAdjust,
+						  const std::vector<CloudPoint> & mapToAdjust,
+						  const CamCalibration &K,
+						  const CamDistortion &D,
+						  const std::vector<int>&selectedKeyframes);
 
 
     /// @brief update all ceres problem variables.
@@ -82,10 +104,11 @@ private :
     /// @param[in] mapToAjust:     takes 3D point correction .
     /// @param[in] K:              takes intrinsic parameters correction.
     /// @param[in] D:              takes intrinsic parameters correction.
-    void updateCeresProblem(std::vector<SRef<Keyframe>>&framesToAdjust,
-                            std::vector<CloudPoint> & mapToAdjust,
-                            CamCalibration &K,
-                            CamDistortion &D);
+    void updateCeresProblem(const std::vector<CloudPoint> & mapToAdjust, 
+							std::vector<CloudPoint> & mapAdjusted,
+							std::vector<SRef<Keyframe>>&framesAdjusted,                          
+                            CamCalibration &KAdjusted,
+                            CamDistortion &DAdjusted);
 
 
 
@@ -93,7 +116,7 @@ private :
 
     /// @brief update 3D point variable.
     /// @param[in] mapToAjust:     takes 3D point correction .
-    void updateMap(std::vector<CloudPoint> & mapToAdjust);
+    void updateMap(const std::vector<CloudPoint> & mapToAdjust, std::vector<CloudPoint> & mapdjusted);
     /// @brief update extrinsic parameters variable.
     /// @param[in] framesToAdjust: takes extrinsic parameters correction.
     void updateExtrinsic(std::vector<SRef<Keyframe>> & framesToAdjust);
