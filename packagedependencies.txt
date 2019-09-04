@@ -1,4 +1,4 @@
-SolARFramework|0.6.0|SolARFramework|github|https://github.com/SolarFramework/SolarFramework/releases/download
-ceres|1.14.0|ceres|thirdParties|https://github.com/SolarFramework/binaries/releases/download
-glog|0.3.5|glog|thirdParties|https://github.com/SolarFramework/binaries/releases/download
-gflags|2.2.1|gflags|thirdParties|https://github.com/SolarFramework/binaries/releases/download
+SolARFramework|0.6.0|SolARFramework|SolARBuild@github|https://github.com/SolarFramework/SolarFramework/releases/download
+ceres|1.14.0|ceres|thirdParties@github|https://github.com/SolarFramework/binaries/releases/download
+glog|0.3.5|glog|thirdParties@github|https://github.com/SolarFramework/binaries/releases/download
+gflags|2.2.1|gflags|thirdParties@github|https://github.com/SolarFramework/binaries/releases/download
