@@ -288,11 +288,11 @@ struct SolARBALoader{
 int run_bundle(std::string & scene){
     LOG_ADD_LOG_TO_CONSOLE();
     SolARBALoader *ba = new SolARBALoader();
-    const std::string path_poses        = "./" + scene + "Bundle/" + scene + "Poses.txt";
-    const std::string path_points3d     = "./" + scene + "Bundle/" + scene + "Pts3D.txt";;
-    const std::string path_points2d     = "./" + scene + "Bundle/" + scene + "Pts2D.txt";
-    const std::string path_calibration  = "./" + scene + "Bundle/" + scene + "Calibration.txt";
-    const std::string path_distorison   = "./" + scene + "Bundle/" + scene + "Distorsion.txt";
+    const std::string path_poses        = "../../" + scene + "Bundle/" + scene + "Poses.txt";
+    const std::string path_points3d     = "../../" + scene + "Bundle/" + scene + "Pts3D.txt";;
+    const std::string path_points2d     = "../../" + scene + "Bundle/" + scene + "Pts2D.txt";
+    const std::string path_calibration  = "../../" + scene + "Bundle/" + scene + "Calibration.txt";
+    const std::string path_distorison   = "../../" + scene + "Bundle/" + scene + "Distorsion.txt";
 
     LOG_INFO("-<SolAR BA PROBLEM LOADING>-");
     ba->load3DPoints(path_points3d);
@@ -302,22 +302,22 @@ int run_bundle(std::string & scene){
     ba->loadDistorsions(path_distorison);
 	ba->fillKeyframes();
 
-
+	const std::string path_config = "conf_Bundle.xml";
     SRef<xpcf::IComponentManager> xpcfComponentManager = xpcf::getComponentManagerInstance();
-    if(xpcfComponentManager->load("conf_Bundle.xml")!=org::bcom::xpcf::_SUCCESS)
+    if(xpcfComponentManager->load(path_config.c_str())!=org::bcom::xpcf::_SUCCESS)
     {
-        LOG_ERROR("Failed to load the configuration file conf_Bundle.xml")
+        LOG_ERROR("Failed to load the configuration {}",path_config)
         return -1;
     }
-
-	SRef<display::I3DPointsViewer> viewer3DPoints = xpcfComponentManager->create<SolAR3DPointsViewerOpengl>()->bindTo<display::I3DPointsViewer>();
-	LOG_INFO("-<SolAR3DPointsViewerOpengl: loaded>-");
+	LOG_INFO("-<SolARBundlerCeres:>-");
 	SRef < solver::map::IBundler> bundler = xpcfComponentManager->create<SolARBundlerCeres>()->bindTo<api::solver::map::IBundler>();
-	LOG_INFO("-<SolARBundlerCeres: loaded>-");
+	LOG_INFO("-<SolAR3DPointsViewerOpengl:>-");
+	SRef<display::I3DPointsViewer> viewer3DPoints = xpcfComponentManager->create<SolAR3DPointsViewerOpengl>()->bindTo<display::I3DPointsViewer>();
 
 
 
-	std::vector<int>selectedKeyframes = { 0,1,2,3 };
+
+	std::vector<int>selectedKeyframes; // = { 0,1,2,3 };
 	std::vector<CloudPoint>correctedCloud;
 	std::vector<SRef<Keyframe>>correctedKeyframes;
 

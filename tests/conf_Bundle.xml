@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<xpcf-registry autoAlias="true">  
+	<module uuid="6e960df6-9a36-11e8-9eb6-529269fb1459" name="SolARModuleOpenGL" description="SolARModuleOpenGL" path="$REMAKENROOT/SolARModuleOpenGL/0.6.0/lib/x86_64/shared">
+        <component uuid="afd38ea0-9a46-11e8-9eb6-529269fb1459" name="SolAR3DPointsViewerOpengl" description="SolAR3DPointsViewerOpengl">
+                <interface uuid="125f2007-1bf9-421d-9367-fbdc1210d006" name="IComponentIntrospect" description="IComponentIntrospect"/>
+                <interface uuid="575d365a-9a27-11e8-9eb6-529269fb1459" name="I3DPointsViewer" description="I3DPointsViewer"/>
+        </component>
+    </module> 
+	<module uuid="09f4a367-c5bf-4a9f-9f3b-42424d52f717" name="SolARModuleCeres" description="SolARModuleCeres" path="$REMAKENROOT/SolARModuleCeres/0.6.0/lib/x86_64/shared">
+        <component uuid="4897fc13-682c-4e95-8aba-abd9f7a17193" name="SolARBundlerCeres" description="SolARBundlerCeres">
+                <interface uuid="125f2007-1bf9-421d-9367-fbdc1210d006" name="IComponentIntrospect" description="IComponentIntrospect"/>
+                <interface uuid="35b9bdb7-d23c-4909-984f-ae7f9a292e6c" name="IBundler" description="IBundler"/>
+        </component>
+    </module>
+	<properties>		
+		<configure component="SolAR3DPointsViewerOpengl">
+            <property name="title" type="string" value="Points Cloud"/>
+			<property name="width" type="UnsignedInteger" value="1280"/>
+			<property name="height" type="UnsignedInteger" value="960"/>
+			<property name="backgroundColor" type="UnsignedInteger">
+				<value>0</value>
+				<value>0</value>
+				<value>0</value>
+			</property>
+			<property name="fixedPointsColor" type="UnsignedInteger" value="1"/>
+			<property name="pointsColor" type="UnsignedInteger">
+				<value>0</value>
+				<value>255</value>
+				<value>0</value>
+			</property>
+			<property name="cameraColor" type="UnsignedInteger">
+				<value>255</value>
+				<value>255</value>
+				<value>255</value>
+			</property>
+			<property name="drawCameraAxis" type="UnsignedInteger" value="1"/>
+			<property name="drawSceneAxis" type="UnsignedInteger" value="1"/>
+			<property name="drawWorldAxis" type="UnsignedInteger" value="1"/>
+			<property name="axisScale" type="Float" value="1.0"/>
+			<property name="pointSize" type="Float" value="3.0"/>
+			<property name="cameraScale" type="Float" value="1.0"/>
+			<property name="keyframeAsCamera" type="UnsignedInteger" value="1"/>
+			<property name="framesColor" type="UnsignedInteger">
+				<value>255</value>
+				<value>0</value>
+				<value>0</value>
+			</property>
+			<property name="keyframesColor" type="UnsignedInteger">
+				<value>0</value>
+				<value>0</value>
+				<value>255</value>
+			</property>
+			<property name="zoomSensitivity" type="Float" value="10.0"/>
+			<property name="exitKey" type="Integer" value="27"/>
+        </configure>
+		<configure component="SolARBundlerCeres"> 
+            <property name="iterationsCount" type="UnsignedInteger" value="10"/>
+			<property name="fixedMap" type="UnsignedInteger" value="1"/>
+			<property name="fixedExtrinsics" type="UnsignedInteger" value="0"/>
+			<property name="fixedIntrinsics" type="UnsignedInteger" value="1"/>
+			<property name="fixedFirstPose" type="UnsignedInteger" value="0"/>
+        </configure>	
+    </properties>
+</xpcf-registry>
