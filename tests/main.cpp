@@ -309,9 +309,9 @@ int run_bundle(std::string & scene){
         LOG_ERROR("Failed to load the configuration {}",path_config)
         return -1;
     }
-	LOG_INFO("-<SolARBundlerCeres:>-");
+	LOG_INFO("-<SolARBundlerCeres: >-");
 	SRef < solver::map::IBundler> bundler = xpcfComponentManager->create<SolARBundlerCeres>()->bindTo<api::solver::map::IBundler>();
-	LOG_INFO("-<SolAR3DPointsViewerOpengl:>-");
+	LOG_INFO("-<SolAR3DPointsViewerOpengl: >-");
 	SRef<display::I3DPointsViewer> viewer3DPoints = xpcfComponentManager->create<SolAR3DPointsViewerOpengl>()->bindTo<display::I3DPointsViewer>();
 
 
@@ -319,18 +319,10 @@ int run_bundle(std::string & scene){
 
 	std::vector<int>selectedKeyframes; // = { 0,1,2,3 };
 	std::vector<CloudPoint>correctedCloud;
-	std::vector<SRef<Keyframe>>correctedKeyframes;
+	std::vector<Transform3Df>correctedPoses;
 
 
-	correctedKeyframes.resize(ba->getKeyframes().size());
-	for (unsigned i = 0; i < ba->getKeyframes().size(); ++i) {
-		Transform3Df tt = Transform3Df::Identity();
-		correctedKeyframes[i] = xpcf::utils::make_shared<Keyframe>(ba->getKeyframe(i)->getKeypoints(),
-																	ba->getKeyframe(i)->getDescriptors(),
-																	ba->getKeyframe(i)->getView(),
-																	tt);
-	}
-
+	correctedPoses.resize(ba->getKeyframes().size());
 	CamCalibration correctedCalib;
 	CamDistortion correctedDist;
 
@@ -340,17 +332,10 @@ int run_bundle(std::string & scene){
 										ba->getCamCalibration(),
 										ba->getCamDistorsion(),
 										selectedKeyframes,
-										correctedKeyframes,
+										correctedPoses,
 										correctedCloud,
 										correctedCalib,
 										correctedDist);
-
-
-	std::vector<Transform3Df>correctedPoses;
-	for (unsigned i = 0; i < correctedKeyframes.size(); ++i) {
-		Transform3Df tt = correctedKeyframes[i]->getPose();
-		correctedPoses.push_back(tt);
-	}
 
     
    LOG_INFO("reprojection error final: {}",reproj_errorFinal);
