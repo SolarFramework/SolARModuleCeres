@@ -22,8 +22,6 @@
 
 //#include <boost/log/core.hpp>
 
-#include "SolARModuleOpengl_traits.h"
-#include "SolARModuleCeres_traits.h"
 #include "xpcf/xpcf.h"
 #include "api/display/I3DPointsViewer.h"
 #include "api/solver/map/IBundler.h"
@@ -32,8 +30,6 @@
 using namespace SolAR;
 using namespace SolAR::datastructure;
 using namespace SolAR::api;
-using namespace SolAR::MODULES::OPENGL;
-using namespace SolAR::MODULES::CERES;
 namespace xpcf = org::bcom::xpcf;
 
 
@@ -287,73 +283,78 @@ struct SolARBALoader{
 
 int run_bundle(std::string & scene){
     LOG_ADD_LOG_TO_CONSOLE();
-    SolARBALoader *ba = new SolARBALoader();
-    const std::string path_poses        = "../../" + scene + "Bundle/" + scene + "Poses.txt";
-    const std::string path_points3d     = "../../" + scene + "Bundle/" + scene + "Pts3D.txt";;
-    const std::string path_points2d     = "../../" + scene + "Bundle/" + scene + "Pts2D.txt";
-    const std::string path_calibration  = "../../" + scene + "Bundle/" + scene + "Calibration.txt";
-    const std::string path_distorison   = "../../" + scene + "Bundle/" + scene + "Distorsion.txt";
 
-    LOG_INFO("-<SolAR BA PROBLEM LOADING>-");
-    ba->load3DPoints(path_points3d);
-    ba->load2DPoints(path_points2d);
-    ba->loadExtrinsics(path_poses);
-    ba->loadIntrinsic(path_calibration);
-    ba->loadDistorsions(path_distorison);
-	ba->fillKeyframes();
+    try {
 
-	const std::string path_config = "conf_Bundle.xml";
-    SRef<xpcf::IComponentManager> xpcfComponentManager = xpcf::getComponentManagerInstance();
-    if(xpcfComponentManager->load(path_config.c_str())!=org::bcom::xpcf::_SUCCESS)
+        SolARBALoader *ba = new SolARBALoader();
+        const std::string path_poses        = "../" + scene + "Bundle/" + scene + "Poses.txt";
+        const std::string path_points3d     = "../" + scene + "Bundle/" + scene + "Pts3D.txt";;
+        const std::string path_points2d     = "../" + scene + "Bundle/" + scene + "Pts2D.txt";
+        const std::string path_calibration  = "../" + scene + "Bundle/" + scene + "Calibration.txt";
+        const std::string path_distorison   = "../" + scene + "Bundle/" + scene + "Distorsion.txt";
+
+        LOG_INFO("-<SolAR BA PROBLEM LOADING>-");
+        ba->load3DPoints(path_points3d);
+        ba->load2DPoints(path_points2d);
+        ba->loadExtrinsics(path_poses);
+        ba->loadIntrinsic(path_calibration);
+        ba->loadDistorsions(path_distorison);
+        ba->fillKeyframes();
+
+        const std::string path_config = "conf_Bundler.xml";
+        SRef<xpcf::IComponentManager> xpcfComponentManager = xpcf::getComponentManagerInstance();
+        if(xpcfComponentManager->load(path_config.c_str())!=org::bcom::xpcf::_SUCCESS)
+        {
+            LOG_ERROR("Failed to load the configuration {}",path_config)
+            return -1;
+        }
+        LOG_INFO("-<SolARBundlerCeres: >-");
+        SRef < solver::map::IBundler> bundler = xpcfComponentManager->resolve<api::solver::map::IBundler>();
+        LOG_INFO("-<SolAR3DPointsViewerOpengl: >-");
+        SRef<display::I3DPointsViewer> viewer3DPoints = xpcfComponentManager->resolve<display::I3DPointsViewer>();
+
+        std::vector<int>selectedKeyframes; // = { 0,1,2,3 };
+        std::vector<CloudPoint>correctedCloud;
+        std::vector<Transform3Df>correctedPoses;
+
+
+        correctedPoses.resize(ba->getKeyframes().size());
+        CamCalibration correctedCalib;
+        CamDistortion correctedDist;
+
+        double reproj_errorFinal = 0.f;
+        reproj_errorFinal = bundler->solve(ba->getKeyframes(),
+                                            ba->get3DPoints(),
+                                            ba->getCamCalibration(),
+                                            ba->getCamDistorsion(),
+                                            selectedKeyframes,
+                                            correctedPoses,
+                                            correctedCloud,
+                                            correctedCalib,
+                                            correctedDist);
+
+       LOG_INFO("reprojection error final: {}",reproj_errorFinal);
+
+        std::vector<Transform3Df>framePoses;
+        Transform3Df pp = Transform3Df::Identity();
+        while (true) {
+            if (viewer3DPoints->display(ba->get3DPoints(),
+                pp,
+                ba->getPoses(),
+                framePoses,
+                correctedCloud,
+                correctedPoses) == FrameworkReturnCode::_STOP) {
+                return 0;
+            }
+
+        }
+        delete ba;
+    }
+    catch (xpcf::Exception e)
     {
-        LOG_ERROR("Failed to load the configuration {}",path_config)
+        LOG_ERROR ("The following exception has been catched: {}", e.what());
         return -1;
     }
-	LOG_INFO("-<SolARBundlerCeres: >-");
-	SRef < solver::map::IBundler> bundler = xpcfComponentManager->create<SolARBundlerCeres>()->bindTo<api::solver::map::IBundler>();
-	LOG_INFO("-<SolAR3DPointsViewerOpengl: >-");
-	SRef<display::I3DPointsViewer> viewer3DPoints = xpcfComponentManager->create<SolAR3DPointsViewerOpengl>()->bindTo<display::I3DPointsViewer>();
-
-
-
-
-	std::vector<int>selectedKeyframes; // = { 0,1,2,3 };
-	std::vector<CloudPoint>correctedCloud;
-	std::vector<Transform3Df>correctedPoses;
-
-
-	correctedPoses.resize(ba->getKeyframes().size());
-	CamCalibration correctedCalib;
-	CamDistortion correctedDist;
-
-	double reproj_errorFinal = 0.f;
-	reproj_errorFinal = bundler->solve(ba->getKeyframes(),
-										ba->get3DPoints(),
-										ba->getCamCalibration(),
-										ba->getCamDistorsion(),
-										selectedKeyframes,
-										correctedPoses,
-										correctedCloud,
-										correctedCalib,
-										correctedDist);
-
-    
-   LOG_INFO("reprojection error final: {}",reproj_errorFinal);
-
-    std::vector<Transform3Df>framePoses;
-    Transform3Df pp = Transform3Df::Identity();
-	while (true) {
-		if (viewer3DPoints->display(ba->get3DPoints(),
-			pp,
-			ba->getPoses(),
-			framePoses,
-			correctedCloud,
-			correctedPoses) == FrameworkReturnCode::_STOP) {
-			return 0;
-		}
-
-	}
-    delete ba;
     return 0;
 }
 int main(int argc, char ** argv){

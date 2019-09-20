@@ -1,5 +1,5 @@
-TARGET = SolARTestModuleCeres
-VERSION=0.5.2
+TARGET = SolARTestModuleCeresBundler
+VERSION=0.6.0
 
 CONFIG += c++11
 CONFIG -= qt
@@ -13,15 +13,21 @@ CONFIG(debug,debug|release) {
 }
 
 CONFIG(release,debug|release) {
+    DEFINES += _NDEBUG=1
     DEFINES += NDEBUG=1
 }
 
 win32:CONFIG -= static
 win32:CONFIG += shared
 
-DEPENDENCIESCONFIG = sharedlib
-#NOTE : CONFIG as staticlib or sharedlib, DEPENDENCIESCONFIG as staticlib or sharedlib MUST BE DEFINED BEFORE templatelibconfig.pri inclusion
-include ($$(BCOMDEVROOT)/builddefs/qmake/templateappconfig.pri)
+DEPENDENCIESCONFIG = shared recursive install
+
+## Configuration for Visual Studio to install binaries and dependencies. Work also for QT Creator by replacing QMAKE_INSTALL
+PROJECTCONFIG = QTVS
+
+#NOTE : CONFIG as staticlib or sharedlib, DEPENDENCIESCONFIG as staticlib or sharedlib, QMAKE_TARGET.arch and PROJECTDEPLOYDIR MUST BE DEFINED BEFORE templatelibconfig.pri inclusion
+include (../../../builddefs/qmake/templateappconfig.pri)
+
 
 HEADERS += \
 
@@ -49,3 +55,5 @@ win32 {
 
 }
 
+#NOTE : Must be placed at the end of the .pro
+include (../../../builddefs/qmake/remaken_install_lib.pri)
