@@ -218,8 +218,8 @@ namespace SolAR {
 									int idxPoint = i;
 									int idxLoc = it->second;
 									ceresObserv v;
-									v.oPt = Point2Df(originalFrames[idxCam0]->getKeypoints()[idxLoc].getX(),
-										originalFrames[idxCam0]->getKeypoints()[idxLoc].getY());
+                                    v.oPt = Point2Df(originalFrames[idxCam0]->getKeypoints()[idxLoc].getX(),
+                                        originalFrames[idxCam0]->getKeypoints()[idxLoc].getY());
 									v.cIdx = idxCam0;
 									v.pIdx = idxPoint;
 									observations_temp.push_back(v);
@@ -239,8 +239,8 @@ namespace SolAR {
 								int idxCam = it->first;
 								int idxLoc = it->second;
 								int idxPoint = i;
-								v.oPt = Point2Df(originalFrames[idxCam]->getKeypoints()[idxLoc].getX(),
-									originalFrames[idxCam]->getKeypoints()[idxLoc].getY());
+                                v.oPt = Point2Df(originalFrames[idxCam]->getKeypoints()[idxLoc].getX(),
+                                    originalFrames[idxCam]->getKeypoints()[idxLoc].getY());
 								v.cIdx = idxCam;
 								v.pIdx = idxPoint;
 								observations_temp.push_back(v);
