@@ -38,12 +38,8 @@ DEFINES += "_BCOM_SHARED=__declspec(dllexport)"
 
 INCLUDEPATH += interfaces/
 
-HEADERS += interfaces/SolARCeresAPI.h \
-           interfaces/SolARBundlerCeres.h \
-           interfaces/SolARModuleCeres_traits.h
+include (SolARModuleCeres.pri)
 
-SOURCES += src/SolARModuleCeres.cpp \
-           src/SolARBundlerCeres.cpp
 unix {
 }
 
