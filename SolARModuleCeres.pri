@@ -4,3 +4,4 @@ HEADERS += interfaces/SolARCeresAPI.h \
 
 SOURCES += src/SolARModuleCeres.cpp \
            src/SolARBundlerCeres.cpp
+
