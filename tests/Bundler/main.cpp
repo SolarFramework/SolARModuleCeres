@@ -19,8 +19,7 @@
 #include <string>
 #include <vector>
 
-
-//#include <boost/log/core.hpp>
+#include <boost/log/core.hpp>
 
 #include "xpcf/xpcf.h"
 #include "api/display/I3DPointsViewer.h"
@@ -284,6 +283,10 @@ struct SolARBALoader{
 int run_bundle(std::string & scene){
     LOG_ADD_LOG_TO_CONSOLE();
 
+#if NDEBUG
+    boost::log::core::get()->set_logging_enabled(false);
+#endif
+
     try {
 
         SolARBALoader *ba = new SolARBALoader();
@@ -301,7 +304,7 @@ int run_bundle(std::string & scene){
         ba->loadDistorsions(path_distorison);
         ba->fillKeyframes();
 
-        const std::string path_config = "conf_Bundler.xml";
+        const std::string path_config = "SolARCeresBundler_conf.xml";
         SRef<xpcf::IComponentManager> xpcfComponentManager = xpcf::getComponentManagerInstance();
         if(xpcfComponentManager->load(path_config.c_str())!=org::bcom::xpcf::_SUCCESS)
         {

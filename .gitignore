@@ -63,7 +63,7 @@ x64*
 doc/
 doxygen/
 
-tests/SolARHomographyEstimation/xpcf_custom\.xml
+tests/bin/
 
 build-SolARTestModuleCeres-R/pose1.txt
 build-SolARTestModuleCeres-R/pose0.txt
