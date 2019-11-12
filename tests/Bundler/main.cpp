@@ -151,7 +151,7 @@ struct SolARBALoader{
                    int idxView,idxLoc;
                     ox >>idxView;
                     ox >>idxLoc;
-                    m_points3d[i].getVisibility()[idxView] = idxLoc;
+                    m_points3d[i].visibilityAddKeypoint(idxView, idxLoc);
                 }
             }
             std::cout<<" done"<<std::endl;
