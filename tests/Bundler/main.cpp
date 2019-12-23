@@ -290,11 +290,11 @@ int run_bundle(std::string & scene){
     try {
 
         SolARBALoader *ba = new SolARBALoader();
-        const std::string path_poses        = "../" + scene + "Bundle/" + scene + "Poses.txt";
-        const std::string path_points3d     = "../" + scene + "Bundle/" + scene + "Pts3D.txt";;
-        const std::string path_points2d     = "../" + scene + "Bundle/" + scene + "Pts2D.txt";
-        const std::string path_calibration  = "../" + scene + "Bundle/" + scene + "Calibration.txt";
-        const std::string path_distorison   = "../" + scene + "Bundle/" + scene + "Distorsion.txt";
+        const std::string path_poses        = "../../" + scene + "Bundle/" + scene + "Poses.txt";
+        const std::string path_points3d     = "../../" + scene + "Bundle/" + scene + "Pts3D.txt";;
+        const std::string path_points2d     = "../../" + scene + "Bundle/" + scene + "Pts2D.txt";
+        const std::string path_calibration  = "../../" + scene + "Bundle/" + scene + "Calibration.txt";
+        const std::string path_distorison   = "../../" + scene + "Bundle/" + scene + "Distorsion.txt";
 
         LOG_INFO("-<SolAR BA PROBLEM LOADING>-");
         ba->load3DPoints(path_points3d);
