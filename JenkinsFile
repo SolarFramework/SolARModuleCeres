@@ -31,8 +31,6 @@ pipeline {
         stage("Get Third Parties") {
             steps {
                 installDependency('ceres','1.14.0')
-                installDependency('glog','0.3.5')
-                installDependency('gflags','2.2.1')
             }
         }            
 
