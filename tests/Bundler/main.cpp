@@ -19,11 +19,8 @@
 #include <string>
 #include <vector>
 
+#include <boost/log/core.hpp>
 
-//#include <boost/log/core.hpp>
-
-#include "SolARModuleOpengl_traits.h"
-#include "SolARModuleCeres_traits.h"
 #include "xpcf/xpcf.h"
 #include "api/display/I3DPointsViewer.h"
 #include "api/solver/map/IBundler.h"
@@ -32,8 +29,6 @@
 using namespace SolAR;
 using namespace SolAR::datastructure;
 using namespace SolAR::api;
-using namespace SolAR::MODULES::OPENGL;
-using namespace SolAR::MODULES::CERES;
 namespace xpcf = org::bcom::xpcf;
 
 
@@ -46,13 +41,54 @@ namespace xpcf = org::bcom::xpcf;
 ///Shows : all the loaded parameters.
 ///
 struct SolARBALoader{
-    std::vector<std::vector<SRef<Keypoint>>>m_points2d;
+	std::vector<SRef<Keyframe>>m_keyframes;
+	std::vector<std::vector<Keypoint>>m_points2d;
 	std::vector<Transform3Df>m_poses;
-    std::vector<SRef<CloudPoint>>m_points3d;
+    std::vector<CloudPoint>m_points3d;
     std::vector<SRef<Image>> m_views;
     std::vector<SRef<DescriptorBuffer>> m_descriptors;
 	CamCalibration  m_intrinsic;
 	CamDistortion   m_distorsion;
+
+	const std::vector<CloudPoint> get3DPoints() {
+		return m_points3d;
+	}
+
+	const std::vector<Keypoint> get2DPoints(int i) {
+		return m_points2d[i];
+	}
+
+
+	const std::vector<SRef<Keyframe>> getKeyframes() {
+		return m_keyframes;
+	}
+
+	const SRef<Keyframe> &getKeyframe(int i) {
+		return m_keyframes[i];
+	}
+
+	const CamCalibration getCamCalibration() {
+		return m_intrinsic;
+	}
+	const CamDistortion getCamDistorsion() {
+		return m_distorsion;
+	}
+
+	const std::vector<Transform3Df> getPoses() {
+		return m_poses;
+	}
+	void fillKeyframes() {
+		m_keyframes.resize(m_poses.size());
+		m_descriptors.resize(m_poses.size());
+		m_views.resize(m_poses.size());
+		for (unsigned int i = 0; i < m_keyframes.size(); ++i) {
+			m_keyframes[i] = xpcf::utils::make_shared<Keyframe>(get2DPoints(i),
+				m_descriptors[i],
+				m_views[i],
+				m_poses[i]);
+
+		}
+	}
 
     bool load2DPoints(const std::string & path_measures) {
         int N;
@@ -82,7 +118,7 @@ struct SolARBALoader{
                         float x,y;
                         ox >>x;
                         ox >>y;
-                        m_points2d[i][j] = xpcf::utils::make_shared<Keypoint>(x,y,0.0,0.0,0.0,0.0,0);
+                        m_points2d[i][j] = Keypoint(x,y,0.0,0.0,0.0,0.0,0);
                     }
                 }   
             }
@@ -109,13 +145,13 @@ struct SolARBALoader{
 
                 std::map<unsigned int, unsigned int> visibility_temp;
 
-               m_points3d[i] = xpcf::utils::make_shared<CloudPoint>(x, y, z,0.0,0.0,0.0,0.0,visibility_temp);
+               m_points3d[i] = CloudPoint(x, y, z,0.0,0.0,0.0,0.0,visibility_temp);
                int viz_no; ox >> viz_no;
                for(int j = 0; j < viz_no; ++j) {
                    int idxView,idxLoc;
                     ox >>idxView;
                     ox >>idxLoc;
-                    m_points3d[i]->getVisibility()[idxView] = idxLoc;
+                    m_points3d[i].visibilityAddKeypoint(idxView, idxLoc);
                 }
             }
             std::cout<<" done"<<std::endl;
@@ -201,9 +237,9 @@ struct SolARBALoader{
         std::cout << "<3D POINTS>: " << std::endl;
         std::cout<<"    ->size: "<<m_points3d.size()<<std::endl;
         for (unsigned int i = 0; i < m_points3d.size(); ++i){
-            std::cout << "p: " << m_points3d[i]->getX() << " " <<  m_points3d[i]->getY() << " " <<  m_points3d[i]->getZ() << "  ";
+            std::cout << "p: " << m_points3d[i].getX() << " " <<  m_points3d[i].getY() << " " <<  m_points3d[i].getZ() << "  ";
 
-            std::map<unsigned int, unsigned int> visibility = m_points3d[i]->getVisibility();
+            std::map<unsigned int, unsigned int> visibility = m_points3d[i].getVisibility();
             int idxFrame = 0;
             for (std::map<unsigned int, unsigned int>::iterator it = visibility.begin(); it != visibility.end(); ++it){
                 std::cout<<it->first<<" "<<it->second<<" ";
@@ -218,7 +254,7 @@ struct SolARBALoader{
         for (int i = 0; i < m_points2d.size(); ++i) {
             std::cout << "	<2D POINTS from view: " << i << ">:" << std::endl;
             for (int j = 0; j < m_points2d[i].size(); ++j) {
-                std::cout << m_points2d[i][j]->getX() << " " <<  m_points2d[i][j]->getY() << std::endl;
+                std::cout << m_points2d[i][j].getX() << " " <<  m_points2d[i][j].getY() << std::endl;
             }
         }
     }
@@ -246,96 +282,82 @@ struct SolARBALoader{
 
 int run_bundle(std::string & scene){
     LOG_ADD_LOG_TO_CONSOLE();
-    SolARBALoader *ba = new SolARBALoader();
-    const std::string path_poses        = "./" + scene + "Bundle/" + scene + "Poses.txt";
-    const std::string path_points3d     = "./" + scene + "Bundle/" + scene + "Pts3D.txt";;
-    const std::string path_points2d     = "./" + scene + "Bundle/" + scene + "Pts2D.txt";
-    const std::string path_calibration  = "./" + scene + "Bundle/" + scene + "Calibration.txt";
-    const std::string path_distorison   = "./" + scene + "Bundle/" + scene + "Distorsion.txt";
 
-    LOG_INFO("-<SolAR BA PROBLEM LOADING>-");
-    ba->load3DPoints(path_points3d);
-    ba->load2DPoints(path_points2d);
-    ba->loadExtrinsics(path_poses);
-    ba->loadIntrinsic(path_calibration);
-    ba->loadDistorsions(path_distorison);
+#if NDEBUG
+    boost::log::core::get()->set_logging_enabled(false);
+#endif
 
+    try {
 
- //// uncomment code below to show ba problem.
- //   ba->show3DPoints();
- //   ba->show2Dpoints();
- //   ba->showExtrinsics();
- //   ba->showIntrinsics();
- //   ba->showDistorsions();
+        SolARBALoader *ba = new SolARBALoader();
+        const std::string path_poses        = "../../" + scene + "Bundle/" + scene + "Poses.txt";
+        const std::string path_points3d     = "../../" + scene + "Bundle/" + scene + "Pts3D.txt";;
+        const std::string path_points2d     = "../../" + scene + "Bundle/" + scene + "Pts2D.txt";
+        const std::string path_calibration  = "../../" + scene + "Bundle/" + scene + "Calibration.txt";
+        const std::string path_distorison   = "../../" + scene + "Bundle/" + scene + "Distorsion.txt";
 
-    SRef<xpcf::IComponentManager> xpcfComponentManager = xpcf::getComponentManagerInstance();
-    if(xpcfComponentManager->load("conf_Ceres.xml")!=org::bcom::xpcf::_SUCCESS)
-    {
-        LOG_ERROR("Failed to load the configuration file bundle_config.xml")
-        return -1;
-    }
+        LOG_INFO("-<SolAR BA PROBLEM LOADING>-");
+        ba->load3DPoints(path_points3d);
+        ba->load2DPoints(path_points2d);
+        ba->loadExtrinsics(path_poses);
+        ba->loadIntrinsic(path_calibration);
+        ba->loadDistorsions(path_distorison);
+        ba->fillKeyframes();
 
-    LOG_INFO("-<SolAR3DPointsViewerOpengl LOADING>-");
-    auto viewer3DPoints =xpcfComponentManager->create<SolAR3DPointsViewerOpengl>()->bindTo<display::I3DPointsViewer>();
+        const std::string path_config = "SolARCeresBundler_conf.xml";
+        SRef<xpcf::IComponentManager> xpcfComponentManager = xpcf::getComponentManagerInstance();
+        if(xpcfComponentManager->load(path_config.c_str())!=org::bcom::xpcf::_SUCCESS)
+        {
+            LOG_ERROR("Failed to load the configuration {}",path_config)
+            return -1;
+        }
+        LOG_INFO("-<SolARBundlerCeres: >-");
+        SRef < solver::map::IBundler> bundler = xpcfComponentManager->resolve<api::solver::map::IBundler>();
+        LOG_INFO("-<SolAR3DPointsViewerOpengl: >-");
+        SRef<display::I3DPointsViewer> viewer3DPoints = xpcfComponentManager->resolve<display::I3DPointsViewer>();
 
-    LOG_INFO("-<SolARBundlerCeres LOADING>-");
-    auto bundler =xpcfComponentManager->create<SolARBundlerCeres>()->bindTo<api::solver::map::IBundler>();
-
-
-    std::vector<SRef<Keyframe>>keyframes;
-    keyframes.resize(ba->m_poses.size());
-    ba->m_descriptors.resize(ba->m_poses.size());
-    ba->m_views.resize(ba->m_poses.size());
-
-    for(unsigned int i = 0; i < keyframes.size(); ++i){
-       keyframes[i] = xpcf::utils::make_shared<Keyframe>(ba->m_points2d[i],
-                                                         ba->m_descriptors[i],
-                                                         ba->m_views[i],
-                                                         ba->m_poses[i]);
+        std::vector<int>selectedKeyframes; // = { 0,1,2,3 };
+        std::vector<CloudPoint>correctedCloud;
+        std::vector<Transform3Df>correctedPoses;
 
 
-    }
+        correctedPoses.resize(ba->getKeyframes().size());
+        CamCalibration correctedCalib;
+        CamDistortion correctedDist;
 
+        double reproj_errorFinal = 0.f;
+        reproj_errorFinal = bundler->solve(ba->getKeyframes(),
+                                            ba->get3DPoints(),
+                                            ba->getCamCalibration(),
+                                            ba->getCamDistorsion(),
+                                            selectedKeyframes,
+                                            correctedPoses,
+                                            correctedCloud,
+                                            correctedCalib,
+                                            correctedDist);
 
-    std::vector<int>selectedKeyframes; // = {1,7};
-    std::vector<SRef<CloudPoint>>cloud, cloud_ba;
-    std::vector<Transform3Df>poses , poses_ba;
-    for(unsigned i = 0; i < keyframes.size(); ++i){
-        Transform3Df tt = keyframes[i]->getPose();
-        poses.push_back(tt);
-    }
+       LOG_INFO("reprojection error final: {}",reproj_errorFinal);
 
-   cloud = ba->m_points3d;
-   double reproj_errorFinal  = 0.f;
-   reproj_errorFinal = bundler->solve(keyframes,
-                                      ba->m_points3d,
-                                      ba->m_intrinsic,
-                                      ba->m_distorsion,
-                                      selectedKeyframes);
-
-   LOG_INFO("reprojection error final: {}",reproj_errorFinal);
-    for(auto & p: keyframes){
-        Transform3Df tt = p->getPose();
-        poses_ba.push_back(tt);
-    }
-
-    cloud_ba = ba->m_points3d;
-
-    std::vector<Transform3Df>framePoses;
-    Transform3Df pp = Transform3Df::Identity();
-    while(true){
-        if (viewer3DPoints->display(cloud,
-                                    pp,
-                                    poses,
-                                    framePoses,
-                                    cloud_ba,
-                                    poses_ba) == FrameworkReturnCode::_STOP){
+        std::vector<Transform3Df>framePoses;
+        Transform3Df pp = Transform3Df::Identity();
+        while (true) {
+            if (viewer3DPoints->display(ba->get3DPoints(),
+                pp,
+                ba->getPoses(),
+                framePoses,
+                correctedCloud,
+                correctedPoses) == FrameworkReturnCode::_STOP) {
                 return 0;
             }
+
         }
-
-
-    delete ba;
+        delete ba;
+    }
+    catch (xpcf::Exception e)
+    {
+        LOG_ERROR ("The following exception has been catched: {}", e.what());
+        return -1;
+    }
     return 0;
 }
 int main(int argc, char ** argv){
