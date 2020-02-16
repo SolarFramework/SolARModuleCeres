@@ -18,7 +18,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
-
+#include <filesystem>
 #include <boost/log/core.hpp>
 
 #include "xpcf/xpcf.h"
@@ -105,7 +105,8 @@ struct SolARBALoader{
                 std::cout<<i<<" ";
                 std::string path_measure;
                 ox >> path_measure;
-                std::ifstream ox(path_measure);
+                std::filesystem::path path2DPoints(path_measures);
+                std::ifstream ox(path2DPoints.parent_path().string() + path_measure);
                 if (!ox.is_open()) {
                     std::cerr << " can't find observation file from: " << path_measure << std::endl;
                     return false;
