@@ -5,6 +5,12 @@
 
 namespace SolAR {
 namespace MODULES {
+/**
+ * @namespace SolAR::MODULES::CERES
+ * @brief <B>Provides a bundle adjustment component based on Ceres library: http://ceres-solver.org/</B>
+ * <TT>UUID: 09f4a367-c5bf-4a9f-9f3b-42424d52f717</TT>
+ *
+ */
 namespace CERES {
 
 class SolARBundlerCeres;
