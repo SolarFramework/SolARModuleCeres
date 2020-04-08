@@ -1,3 +1,2 @@
 SolARFramework|0.7.0|SolARFramework|SolARBuild@github|https://github.com/SolarFramework/SolarFramework/releases/download
 ceres|1.14.0|ceres|thirdParties@github|https://github.com/SolarFramework/binaries/releases/download
-gflags|2.2.1|gflags|bincrafters@conan|conan-center
