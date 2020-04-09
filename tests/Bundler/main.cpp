@@ -20,6 +20,7 @@
 #include <vector>
 #include <filesystem>
 #include <boost/log/core.hpp>
+#include <boost/filesystem.hpp>
 
 #include "xpcf/xpcf.h"
 #include "api/display/I3DPointsViewer.h"
@@ -30,6 +31,7 @@ using namespace SolAR;
 using namespace SolAR::datastructure;
 using namespace SolAR::api;
 namespace xpcf = org::bcom::xpcf;
+namespace fs = boost::filesystem;
 
 
 ///@brief: Bundle problem loader struct:
@@ -105,7 +107,7 @@ struct SolARBALoader{
                 std::cout<<i<<" ";
                 std::string path_measure;
                 ox >> path_measure;
-                std::filesystem::path path2DPoints(path_measures);
+                fs::path path2DPoints(path_measures);
                 std::ifstream ox(path2DPoints.parent_path().string() + path_measure);
                 if (!ox.is_open()) {
                     std::cerr << " can't find observation file from: " << path_measure << std::endl;
