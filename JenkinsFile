@@ -26,6 +26,15 @@ pipeline {
             }
         }
 
+       stage("Get Third Parties Release") {
+             when {
+                expression { params.RELEASE == true }
+             }               
+             steps {
+                getThirdParties('1.0.0')
+             }
+        }        
+
         stage("Get Third Parties") {
             when {
                 expression { params.RELEASE == false }
