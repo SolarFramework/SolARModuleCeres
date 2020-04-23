@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
 <xpcf-registry>
-    <module uuid="09f4a367-c5bf-4a9f-9f3b-42424d52f717" name="SolARModuleCeres" path="$REMAKENROOT/packages/SolARBuild/win-cl-14.1/SolARModuleCeres/0.7.0/lib/x86_64/shared">
+    <module uuid="09f4a367-c5bf-4a9f-9f3b-42424d52f717" name="SolARModuleCeres" path="$REMAKENROOT/packages/SolARBuild/win-cl-14.1/SolARModuleCeres/0.8.0/lib/x86_64/shared">
         <component uuid="4897fc13-682c-4e95-8aba-abd9f7a17193" description="SolARBundlerCeres">
                 <interface uuid="125f2007-1bf9-421d-9367-fbdc1210d006" description="IComponentIntrospect"/>
                 <interface uuid="35b9bdb7-d23c-4909-984f-ae7f9a292e6c" description="IBundler"/>
