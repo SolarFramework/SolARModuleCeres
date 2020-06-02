@@ -21,404 +21,499 @@ namespace xpcf = org::bcom::xpcf;
 XPCF_DEFINE_FACTORY_CREATE_INSTANCE(SolAR::MODULES::CERES::SolARBundlerCeres)
 
 namespace SolAR {
-	using namespace datastructure;
-	namespace MODULES {
-		namespace CERES {
-
-			template <typename T>
-			inline void SolARRadialDistorsion(const T &focal_length_x,
-				const T &focal_length_y,
-				const T &principal_point_x,
-				const T &principal_point_y,
-				const T &k1,
-				const T &k2,
-				const T &k3,
-				const T &p1,
-				const T &p2,
-				const T &normalized_x,
-				const T &normalized_y,
-				T *image_x,
-				T *image_y)
-			{
-				T x = normalized_x;
-				T y = normalized_y;
-
-				T r2 = x * x + y * y;
-				T r4 = r2 * r2;
-				T r6 = r4 * r2;
-
-				T r_coeff = 1.0 + k1 * r2 + k2 * r4 + k3 * r6;
-
-				T xd = x * r_coeff + 2.0 * p1 * x * y + p2 * (r2 + 2.0 * x * x);
-				T yd = y * r_coeff + 2.0 * p2 * x * y + p1 * (r2 + 2.0 * y * y);
-
-				*image_x = focal_length_x * xd + principal_point_x;
-				*image_y = focal_length_y * yd + principal_point_y;
-			}
-
-			struct SolARReprojectionError {
-				SolARReprojectionError(double observed_x, double observed_y) : observed_x(observed_x), observed_y(observed_y) {}
-				template <typename T>
-				bool operator()(const T* const cameraIntr,
-					const T* const cameraExtr,
-					const T* const point,
-					T* residuals) const {
-					T p[3];
-					ceres::AngleAxisRotatePoint(cameraExtr, point, p);
-
-					p[0] += cameraExtr[3];
-					p[1] += cameraExtr[4];
-					p[2] += cameraExtr[5];
-
-					T xp = +p[0] / p[2];
-					T yp = +p[1] / p[2];
-
-
-					const T& fx = cameraIntr[0];
-					const T& fy = cameraIntr[1];
-
-					const T& cx = cameraIntr[2];
-					const T& cy = cameraIntr[3];
-
-					const T& k1 = cameraIntr[4];
-					const T& k2 = cameraIntr[5];
-
-					const T& p1 = cameraIntr[6];
-					const T& p2 = cameraIntr[7];
-
-					const T& k3 = cameraIntr[8];
-
-
-					T predicted_x, predicted_y;
-					SolARRadialDistorsion(fx,
-						fy,
-						cx,
-						cy,
-						k1, k2, k3,
-						p1, p2,
-						xp, yp,
-						&predicted_x,
-						&predicted_y);
-
-					residuals[0] = predicted_x - observed_x;
-					residuals[1] = predicted_y - observed_y;
-					return true;
-				}
-				static ceres::CostFunction* create(const double observed_x,
-					const double observed_y) {
-					return (new ceres::AutoDiffCostFunction<SolARReprojectionError, 2, 9, 6, 3>(
-						new SolARReprojectionError(observed_x, observed_y)));
-				}
-				double observed_x;
-				double observed_y;
-			};
-			struct ceresObserv {
-				int cIdx;
-				int pIdx;
-				Point2Df oPt;
-				void show() {
-					std::cout << " obervation: " << std::endl;
-					std::cout << "    # cam idx: " << cIdx << " #3d: " << pIdx << " #2d: " << oPt.getX() << " " << oPt.getY() << std::endl;
-				}
-				ceresObserv() {
-
-				};
-			};
-			SolARBundlerCeres::SolARBundlerCeres() :ConfigurableBase(xpcf::toUUID<SolARBundlerCeres>())
-			{
-				addInterface<IBundler>(this);
-				declareProperty("iterationsCount", m_iterationsNo);
-				declareProperty("fixedMap", m_fixedMap);
-				declareProperty("fixedExtrinsics", m_fixedExtrinsics);
-				declareProperty("fixedIntrinsics", m_fixedIntrinsics);
-				declareProperty("fixedFirstPose", m_holdFirstPose);
-				m_parameters = NULL;
-				LOG_DEBUG(" SolARBundlerCeres constructor");
-			}
-
-
-
-
-
-			double SolARBundlerCeres::solve(const std::vector<SRef<Keyframe>> & originalFrames,
-				const std::vector<CloudPoint> & originalMap,
-				const  CamCalibration & originalCalib,
-				const CamDistortion & originalDist,
-				const std::vector<int> & selectKeyframes,
-				std::vector<Transform3Df> & correctedPoses,
-				std::vector<CloudPoint>&correctedMap,
-				CamCalibration&correctedCalib,
-				CamDistortion &correctedDist) {
-
-				LOG_DEBUG("0. INIT CERES PROBLEM");
-				correctedPoses.resize(originalFrames.size());
-				correctedMap.resize(originalMap.size());
-				double reproj_error = 0.f;
-				initCeresProblem();
-				LOG_DEBUG("ITERATIONS NO: {}", m_iterationsNo);
-				LOG_DEBUG("MAP FIXED ? {}", m_fixedMap);
-				LOG_DEBUG("EXTRINSICS FIXED ? {}", m_fixedExtrinsics);
-				LOG_DEBUG("INTRINSICS FIXED ? {}", m_fixedIntrinsics);
-				LOG_DEBUG("HOLD FIRST POSE ? {}", m_holdFirstPose);
-				LOG_DEBUG("1. FILL CERES PROBLEM");
-				fillCeresProblem(originalFrames,
-					originalMap,
-					originalCalib,
-					originalDist,
-					selectKeyframes);
-				LOG_DEBUG("2. SOLVE CERES PROBLEM");
-				reproj_error = solveCeresProblem();
-				LOG_DEBUG("3. UPDATE  CERES PROBLEM");
-				updateCeresProblem(originalMap,
-					correctedMap,
-					correctedPoses,
-					correctedCalib,
-					correctedDist);
-
-				return reproj_error;
-			}
-
-			void SolARBundlerCeres::initCeresProblem() {
-				m_options.use_nonmonotonic_steps = true;
-				m_options.preconditioner_type = ceres::SCHUR_JACOBI;
-				m_options.linear_solver_type = ceres::ITERATIVE_SCHUR;
-				m_options.use_inner_iterations = true;
-				m_options.max_num_iterations = m_iterationsNo;
-				m_options.minimizer_progress_to_stdout = false;
-			}
-			void SolARBundlerCeres::fillCeresProblem(const std::vector<SRef<Keyframe>> & originalFrames,
-				const std::vector<CloudPoint> & originalMap,
-				const CamCalibration &originalCalib,
-				const CamDistortion &originalDist,
-				const std::vector<int>&selectedKeyframes)
-			{
-
-
-
-				std::vector<ceresObserv>observations_temp;
-				int mapToBundleSize = 0;
-				if (selectedKeyframes.size() > 0) {
-					LOG_DEBUG("#### LOCAL BUNDLER");
-					int minVisibleViews = 2;
-					for (int i = 0; i < originalMap.size(); ++i) {
-						std::map<unsigned int, unsigned int> visibility = originalMap[i].getVisibility();
-						map<unsigned int, unsigned int>::iterator it;
-						int minViz = 0;
-						for (unsigned int c = 0; c < selectedKeyframes.size(); ++c) {
-							it = visibility.find(selectedKeyframes[c]);
-							if (it != visibility.end()) ++minViz;
-						}
-						if (minViz < minVisibleViews)continue;
-						++mapToBundleSize;
-						for (std::map<unsigned int, unsigned int>::iterator it = visibility.begin(); it != visibility.end(); ++it) {
-							int idxCam0 = it->first;
-							for (unsigned int c = 0; c < selectedKeyframes.size(); ++c) { // seen by at least two cameras...!
-								int idxCam1 = selectedKeyframes[c];
-								if (idxCam0 == idxCam1) {
-									int idxPoint = i;
-									int idxLoc = it->second;
-									ceresObserv v;
-                                    v.oPt = Point2Df(originalFrames[idxCam0]->getKeypoints()[idxLoc].getX(),
-                                        originalFrames[idxCam0]->getKeypoints()[idxLoc].getY());
-									v.cIdx = idxCam0;
-									v.pIdx = idxPoint;
-									observations_temp.push_back(v);
-
-								}
-							}
-						}
-					}
-				}
-				else {
-					for (int i = 0; i < originalMap.size(); ++i) {
-						std::map<unsigned int, unsigned int> visibility = originalMap[i].getVisibility();
-						++mapToBundleSize;
-						for (std::map<unsigned int, unsigned int>::iterator it = visibility.begin(); it != visibility.end(); ++it) {
-							if (it->second != -1) {
-								ceresObserv v;
-								int idxCam = it->first;
-								int idxLoc = it->second;
-								int idxPoint = i;
-                                v.oPt = Point2Df(originalFrames[idxCam]->getKeypoints()[idxLoc].getX(),
-                                    originalFrames[idxCam]->getKeypoints()[idxLoc].getY());
-								v.cIdx = idxCam;
-								v.pIdx = idxPoint;
-								observations_temp.push_back(v);
-							}
-						}
-					}
-				}
-
-				LOG_DEBUG("number of points to bundle:{} ", mapToBundleSize);
-				m_observationsNo = observations_temp.size();
-				m_camerasNo = originalFrames.size();
-				m_pointsNo = originalMap.size();
-
-				m_observations = new double[OBSERV_DIM * m_observationsNo];
-
-				m_pointIndex = new int[m_observationsNo];
-				m_extrinsicIndex = new int[m_observationsNo];
-				m_intrinsicIndex = new int[m_observationsNo];
-
-
-				m_parametersNo = (EXT_DIM + INT_DIM) * m_camerasNo + POINT_DIM * m_pointsNo;
-				if (!m_parameters)
-					delete[] m_parameters;
-				m_parameters = new double[m_parametersNo];
-
-				for (int i = 0; i < m_observationsNo; ++i) {
-					m_extrinsicIndex[i] = observations_temp[i].cIdx;
-					m_intrinsicIndex[i] = observations_temp[i].cIdx;
-					m_pointIndex[i] = observations_temp[i].pIdx;
-
-					m_observations[OBSERV_DIM*i + 0] = observations_temp[i].oPt.getX();
-					m_observations[OBSERV_DIM*i + 1] = observations_temp[i].oPt.getY();
-
-				}
-				for (int i = 0; i < originalFrames.size(); ++i) {
-					Vector3f r, t;
-					Transform3Df pose_temp = originalFrames[i]->getPose();
-
-					toRodrigues(pose_temp, r);
-
-					pose_temp = pose_temp.inverse();
-
-					t[0] = pose_temp(0, 3);
-					t[1] = pose_temp(1, 3);
-					t[2] = pose_temp(2, 3);
-
-					float fc = -1.0;
-					m_parameters[EXT_DIM*i + 0] = r[0] * fc;
-					m_parameters[EXT_DIM*i + 1] = r[1] * fc;
-					m_parameters[EXT_DIM*i + 2] = r[2] * fc;
-					m_parameters[EXT_DIM*i + 3] = t[0];
-					m_parameters[EXT_DIM*i + 4] = t[1];
-					m_parameters[EXT_DIM*i + 5] = t[2];
-
-
-					m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 0] = originalCalib(0, 0);
-					m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 1] = originalCalib(1, 1);
-					m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 2] = originalCalib(0, 2);
-					m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 3] = originalCalib(1, 2);
-					m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 4] = originalDist(0);
-					m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 5] = originalDist(1);
-					m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 6] = originalDist(2);
-					m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 7] = originalDist(3);
-					m_parameters[INT_DIM*i + m_camerasNo * EXT_DIM + 8] = originalDist(4);
-
-				}
-				for (int i = 0; i < originalMap.size(); ++i) {
-					m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM + INT_DIM) + 0] = originalMap[i].getX();
-					m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM + INT_DIM) + 1] = originalMap[i].getY();
-					m_parameters[POINT_DIM*i + m_camerasNo * (EXT_DIM + INT_DIM) + 2] = originalMap[i].getZ();
-				}
-
-			}
-
-
-
-
-			double SolARBundlerCeres::solveCeresProblem() {
-				ceres::Problem m_problem;
-				for (int i = 0; i < num_observations(); ++i) {
-					ceres::CostFunction* cost_function = SolARReprojectionError::create(m_observations[OBSERV_DIM * i + 0],
-						m_observations[OBSERV_DIM * i + 1]);
-
-					m_problem.AddResidualBlock(cost_function, NULL, mutable_intrinsic_for_observation(i),
-						mutable_extrinsic_for_observation(i),
-						mutable_point_for_observation(i));
-
-				//	m_problem.SetParameterization(mutable_extrinsic_for_observation(i), new Fixed3DNormParametrization(1.0f));
-
-				}
-
-				if (m_fixedExtrinsics) {
-					for (int i = 0; i < m_camerasNo; ++i)
-						m_problem.SetParameterBlockConstant(mutable_extrinsic_for_observation(i));
-				}
-				else if (m_holdFirstPose) {
-					m_problem.SetParameterBlockConstant(mutable_extrinsic_for_observation(0));
-				}
-				if (m_fixedIntrinsics) {
-					for (int i = 0; i < m_camerasNo; ++i)
-						m_problem.SetParameterBlockConstant(mutable_intrinsic_for_observation(i));
-				}
-				if (m_fixedMap) {
-					for (int i = 0; i < num_observations(); ++i)
-						m_problem.SetParameterBlockConstant(mutable_point_for_observation(i));
-				}
-
-				ceres::Solve(m_options, &m_problem, &m_summary);
-				std::cout << m_summary.FullReport() << "\n";
-				return ((double)m_summary.final_cost / (double)m_pointsNo);
-			}
-
-			void SolARBundlerCeres::updateMap(const std::vector<CloudPoint> & originalMap, std::vector<CloudPoint> & correctedMap) {
-				correctedMap.resize(originalMap.size());
-				for (int j = 0; j < get_points(); ++j) {
-					double x = m_parameters[(j * 3 + 0) + ((EXT_DIM + INT_DIM) * get_cameras())];
-					double y = m_parameters[(j * 3 + 1) + ((EXT_DIM + INT_DIM) * get_cameras())];
-					double z = m_parameters[(j * 3 + 2) + ((EXT_DIM + INT_DIM) * get_cameras())];
-					double reprj_err = originalMap[j].getReprojError();
-					std::map<unsigned int, unsigned int>visibility = originalMap[j].getVisibility();
-					correctedMap[j] = CloudPoint(x, y, z, 0.0, 0.0, 0.0, reprj_err, visibility);
-				}
-			}
-			void SolARBundlerCeres::updateExtrinsic(std::vector<Transform3Df> & correctedPoses) {
-				for (int j = 0; j < m_camerasNo; ++j) {
-					Vector3d r, t, f;
-					Transform3Df pose_temp;
-					r[0] = m_parameters[EXT_DIM * j + 0];
-					r[1] = m_parameters[EXT_DIM * j + 1];
-					r[2] = m_parameters[EXT_DIM * j + 2];
-
-					iRodrigues(r, pose_temp);
-
-					pose_temp(0, 3) = m_parameters[EXT_DIM * j + 3];
-					pose_temp(1, 3) = m_parameters[EXT_DIM * j + 4];
-					pose_temp(2, 3) = m_parameters[EXT_DIM * j + 5];
-
-					pose_temp(3, 0) = 0.0;
-					pose_temp(3, 1) = 0.0;
-					pose_temp(3, 2) = 0.0;
-					pose_temp(3, 3) = 1.0;
-
-
-					pose_temp = pose_temp.inverse();
-					correctedPoses[j] = pose_temp;
-				}
-			}
-
-			void SolARBundlerCeres::updateIntrinsic(CamCalibration &correctedCalib, CamDistortion &correctedDist) {
-
-				int idx = 0;
-				correctedCalib(0, 0) = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 0];
-				correctedCalib(1, 1) = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 1];
-				correctedCalib(0, 2) = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 2];
-				correctedCalib(1, 2) = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 3];
-
-				correctedDist(0) = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 4];
-				correctedDist(1) = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 5];
-				correctedDist(2) = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 6];
-				correctedDist(3) = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 7];
-				correctedDist(4) = m_parameters[INT_DIM*idx + m_camerasNo * EXT_DIM + 8];
-			}
-
-
-
-
-			void SolARBundlerCeres::updateCeresProblem(const std::vector<CloudPoint> & originalMap,
-				std::vector<CloudPoint> & correctedMap,
-				std::vector<Transform3Df>&correctedFrames,
-				CamCalibration &correctedCalib,
-				CamDistortion &correctedDist) {
-				if (!m_fixedMap)
-					updateMap(originalMap, correctedMap);
-				if (!m_fixedExtrinsics)
-					updateExtrinsic(correctedFrames);
-				if (!m_fixedIntrinsics)
-					updateIntrinsic(correctedCalib, correctedDist);
-			}
-		}
-	}
+using namespace datastructure;
+namespace MODULES {
+namespace CERES {
+
+    template <typename T>
+    inline void SolARRadialDistorsion(const T &focal_length_x,
+        const T &focal_length_y,
+        const T &principal_point_x,
+        const T &principal_point_y,
+        const T &k1,
+        const T &k2,
+        const T &k3,
+        const T &p1,
+        const T &p2,
+        const T &normalized_x,
+        const T &normalized_y,
+        T *image_x,
+        T *image_y)
+    {
+        T x = normalized_x;
+        T y = normalized_y;
+
+        T r2 = x * x + y * y;
+        T r4 = r2 * r2;
+        T r6 = r4 * r2;
+
+        T r_coeff = 1.0 + k1 * r2 + k2 * r4 + k3 * r6;
+
+        T xd = x * r_coeff + 2.0 * p1 * x * y + p2 * (r2 + 2.0 * x * x);
+        T yd = y * r_coeff + 2.0 * p2 * x * y + p1 * (r2 + 2.0 * y * y);
+
+        *image_x = focal_length_x * xd + principal_point_x;
+        *image_y = focal_length_y * yd + principal_point_y;
+    }
+
+    struct SolARReprojectionError {
+        SolARReprojectionError(double observed_x, double observed_y) : observed_x(observed_x), observed_y(observed_y) {}
+        template <typename T>
+        bool operator()(const T* const cameraIntr,
+            const T* const cameraExtr,
+            const T* const point,
+            T* residuals) const {
+            T p[3];
+            ceres::AngleAxisRotatePoint(cameraExtr, point, p);
+
+            p[0] += cameraExtr[3];
+            p[1] += cameraExtr[4];
+            p[2] += cameraExtr[5];
+
+            T xp = +p[0] / p[2];
+            T yp = +p[1] / p[2];
+
+
+            const T& fx = cameraIntr[0];
+            const T& fy = cameraIntr[1];
+
+            const T& cx = cameraIntr[2];
+            const T& cy = cameraIntr[3];
+
+            const T& k1 = cameraIntr[4];
+            const T& k2 = cameraIntr[5];
+
+            const T& p1 = cameraIntr[6];
+            const T& p2 = cameraIntr[7];
+
+            const T& k3 = cameraIntr[8];
+
+
+            T predicted_x, predicted_y;
+            SolARRadialDistorsion(fx,
+                fy,
+                cx,
+                cy,
+                k1, k2, k3,
+                p1, p2,
+                xp, yp,
+                &predicted_x,
+                &predicted_y);
+
+            residuals[0] = predicted_x - observed_x;
+            residuals[1] = predicted_y - observed_y;
+            return true;
+        }
+        static ceres::CostFunction* create(const double observed_x,
+            const double observed_y) {
+            return (new ceres::AutoDiffCostFunction<SolARReprojectionError, 2, 9, 6, 3>(
+                new SolARReprojectionError(observed_x, observed_y)));
+        }
+        double observed_x;
+        double observed_y;
+    };
+    struct ceresObserv {
+        int cIdx;
+        int pIdx;
+        Point2Df oPt;
+        void show() {
+            std::cout << " obervation: " << std::endl;
+            std::cout << "    # cam idx: " << cIdx << " #3d: " << pIdx << " #2d: " << oPt.getX() << " " << oPt.getY() << std::endl;
+        }
+        ceresObserv() {
+
+        };
+    };
+    SolARBundlerCeres::SolARBundlerCeres() :ConfigurableBase(xpcf::toUUID<SolARBundlerCeres>())
+    {
+        addInterface<IBundler>(this);
+        declareInjectable<IPointCloudManager>(m_pointCloudManager);
+        declareInjectable<IKeyframesManager>(m_keyframesManager);
+        declareProperty("iterationsCount", m_iterationsNo);
+        declareProperty("fixedMap", m_fixedMap);
+        declareProperty("fixedKeyframes", m_fixedKeyframes);
+        declareProperty("fixedIntrinsics", m_fixedIntrinsics);
+        declareProperty("fixedFirstPose", m_fixedFirstPose);
+        declareProperty("fixedNeighbourKeyframes", m_fixedNeighbourKeyframes);
+        declareProperty("nbMaxFixedKeyframes", m_nbMaxFixedKeyframes);
+        LOG_DEBUG(" SolARBundlerCeres constructor");
+    }
+
+    double SolARBundlerCeres::solve(CamCalibration & K,
+                                    CamDistortion & D,
+                                    const std::vector<uint32_t> & selectedKeyframes) {
+
+        // Init Ceres Problem
+        // ------------------
+
+        LOG_DEBUG("0. INIT CERES PROBLEM");
+        ceres::Solver::Options options;
+        options.use_nonmonotonic_steps = true;
+        options.preconditioner_type = ceres::SCHUR_JACOBI;
+        options.linear_solver_type = ceres::ITERATIVE_SCHUR;
+        options.use_inner_iterations = true;
+        options.max_num_iterations = m_iterationsNo;
+        options.minimizer_progress_to_stdout = false;
+
+        LOG_DEBUG("ITERATIONS NO: {}", m_iterationsNo);
+        LOG_DEBUG("MAP FIXED ? {}", (bool)m_fixedMap);
+        LOG_DEBUG("EXTRINSICS FIXED ? {}", (bool)m_fixedKeyframes);
+        LOG_DEBUG("INTRINSICS FIXED ? {}", (bool)m_fixedIntrinsics);
+        LOG_DEBUG("FIRST POSE FIXED ? {}", (bool)m_fixedFirstPose);
+        LOG_DEBUG("NEIGHBOUR KEYFRAMES FIXED ? {}", (bool)m_fixedNeighbourKeyframes);
+
+
+        // Fill Ceres Problem
+        // ------------------
+        LOG_DEBUG("1. FILL CERES PROBLEM");
+        vector<ceresObserv> observationsTemp;
+
+        // Local KeyFrames
+        std::vector< SRef<Keyframe>> localKeyframes;
+        std::map<uint32_t, uint32_t> solar2CeresKeyframeID;
+
+        // Local KeyPoints
+        std::vector<SRef<CloudPoint>> localCloudPoints;
+        std::map<uint32_t, uint32_t> solar2CeresCloudPointID;
+
+
+        if (selectedKeyframes.size() > 0)
+        {
+            // Fill the local keyframeid set
+            for (auto skf_id : selectedKeyframes) {
+                SRef<Keyframe> localKeyframe;
+                m_keyframesManager->getKeyframe(skf_id, localKeyframe);
+                int ceresKeyframeID = (int)localKeyframes.size();
+                solar2CeresKeyframeID.insert(std::pair<uint32_t, uint32_t>(skf_id, ceresKeyframeID));
+                localKeyframes.push_back(localKeyframe);
+                const std::map<uint32_t, uint32_t>& mapPointVisibility = localKeyframe->getVisibility();
+
+                for (auto const &it_kpId2cpIdVisibility : mapPointVisibility) {
+                    SRef<CloudPoint> localCloudPoint;
+                    m_pointCloudManager->getPoint(it_kpId2cpIdVisibility.second, localCloudPoint);
+                    // Check if the solar point has already been added the set of cloud point
+                    std::map<uint32_t, uint32_t>::iterator itCeresCPIdCorresp = solar2CeresCloudPointID.find(it_kpId2cpIdVisibility.second);
+                    uint32_t ceresCloudPointID;
+                    if (itCeresCPIdCorresp==solar2CeresCloudPointID.end())
+                    {
+                        //insert its id in the SolAR/Ceres cloud point id correspondences map
+                        ceresCloudPointID = (uint32_t)localCloudPoints.size();
+                        solar2CeresCloudPointID.insert(std::pair<uint32_t, uint32_t>(it_kpId2cpIdVisibility.second, ceresCloudPointID));
+
+                        //add the point cloud to the vector of PointCloud
+                        localCloudPoints.push_back(localCloudPoint);
+                    }
+                    else
+                        ceresCloudPointID = itCeresCPIdCorresp->second;
+
+                    //create and add the observation
+                    ceresObserv observTemp;
+                    observTemp.cIdx = ceresKeyframeID;
+                    observTemp.pIdx = ceresCloudPointID;
+                    Keypoint kp = localKeyframe->getKeypoint(it_kpId2cpIdVisibility.first);
+                    observTemp.oPt = Point2Df(kp.getX(), kp.getY());
+                    observationsTemp.push_back(observTemp);
+                }
+            }
+        }
+        else
+        {
+            // Fill the local keyframeid set
+            vector<SRef<Keyframe>> keyframes;
+            m_keyframesManager->getAllKeyframes(keyframes);
+            for (auto localKeyframe : keyframes) {
+                int ceresKeyframeID = (int)localKeyframes.size();
+                solar2CeresKeyframeID.insert(std::pair<uint32_t, uint32_t>(localKeyframe->getId(), ceresKeyframeID));
+                localKeyframes.push_back(localKeyframe);
+                const std::map<uint32_t, uint32_t>& mapPointVisibility = localKeyframe->getVisibility();
+
+                for (auto const &it_kpId2cpIdVisibility : mapPointVisibility) {
+                    SRef<CloudPoint> localCloudPoint;
+                    m_pointCloudManager->getPoint(it_kpId2cpIdVisibility.second, localCloudPoint);
+                    // Check if the solar point has already been added the set of cloud point
+                    std::map<uint32_t, uint32_t>::iterator itCeresCPIdCorresp = solar2CeresCloudPointID.find(it_kpId2cpIdVisibility.second);
+                    uint32_t ceresCloudPointID;
+                    if (itCeresCPIdCorresp==solar2CeresCloudPointID.end())
+                    {
+                        //insert its id in the SolAR/Ceres cloud point id correspondences map
+                        ceresCloudPointID = (uint32_t)localCloudPoints.size();
+                        solar2CeresCloudPointID.insert(std::pair<uint32_t, uint32_t>(it_kpId2cpIdVisibility.second, ceresCloudPointID));
+
+                        //add the point cloud to the vector of PointCloud
+                        localCloudPoints.push_back(localCloudPoint);
+                    }
+                    else
+                        ceresCloudPointID = itCeresCPIdCorresp->second;
+
+                    //create and add the observation
+                    ceresObserv observTemp;
+                    observTemp.cIdx = ceresKeyframeID;
+                    observTemp.pIdx = ceresCloudPointID;
+                    Keypoint kp = localKeyframe->getKeypoint(it_kpId2cpIdVisibility.first);
+                    observTemp.oPt = Point2Df(kp.getX(), kp.getY());
+                    observationsTemp.push_back(observTemp);
+                }
+            }
+        }
+        uint32_t nbLocalKeyframes = (uint32_t) localKeyframes.size();
+
+
+        // Fixed Keyframes. Keyframes in the neighbourhood of the Local keyframes that see Local MapPoints but that are not Local Keyframes
+        std::map<uint32_t, uint32_t> solar2CeresNeighbourKeyframeID;
+        vector<SRef<Keyframe>> neighbourKeyframes;
+        vector<ceresObserv> neighbourObservationsTemp;
+
+        if (m_fixedNeighbourKeyframes)
+        {
+            // For al cloudPoint to optimize, search for keyframes viewing them, but not is the selected keyframes
+            for (auto const cp : localCloudPoints)
+            {
+                const std::map<uint32_t, uint32_t> &kpVisibility = cp->getVisibility();
+                for (auto const &it_kfIDkpIDVisibility : kpVisibility)
+                {
+                    uint32_t ceresNeighbourKFid;
+                    if (solar2CeresKeyframeID.find(it_kfIDkpIDVisibility.first) == solar2CeresKeyframeID.end())
+                     {
+                        ceresNeighbourKFid = nbLocalKeyframes + (uint32_t)solar2CeresNeighbourKeyframeID.size();
+                        solar2CeresNeighbourKeyframeID.insert(std::pair<uint32_t, uint32_t>(it_kfIDkpIDVisibility.first, ceresNeighbourKFid));
+
+                        SRef<Keyframe> neighbourKF;
+                        m_keyframesManager->getKeyframe(it_kfIDkpIDVisibility.first, neighbourKF);
+                        //create and add the observation
+                        std::map<uint32_t, uint32_t>::iterator it_solar2CeresCPid = solar2CeresCloudPointID.find(cp->getId());
+                        if (it_solar2CeresCPid != solar2CeresCloudPointID.end())
+                        {
+                            ceresObserv neighbourObservTemp;
+                            neighbourObservTemp.cIdx = ceresNeighbourKFid;
+                            neighbourObservTemp.pIdx = it_solar2CeresCPid->second;
+                            Keypoint kp = neighbourKF->getKeypoint(it_kfIDkpIDVisibility.second);
+                            neighbourObservTemp.oPt = Point2Df(kp.getX(), kp.getY());
+
+                            neighbourObservationsTemp.push_back(neighbourObservTemp);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fill in Local Keyframe observations
+        uint32_t nbObservations = (uint32_t)observationsTemp.size() + (uint32_t) neighbourObservationsTemp.size();
+        double* observations = new double[OBSERV_DIM * nbObservations];
+        int*    pointIndex = new int[nbObservations];
+        int*    extrinsicIndex = new int[nbObservations];
+        int*    intrinsicIndex = new int[nbObservations];
+
+        // Add Local observations to Ceres
+        for (uint32_t i = 0; i < (uint32_t) observationsTemp.size(); i++)
+        {
+            extrinsicIndex[i] = observationsTemp[i].cIdx;
+            intrinsicIndex[i] = observationsTemp[i].cIdx;
+            pointIndex[i] = observationsTemp[i].pIdx;
+            observations[OBSERV_DIM*i + 0] = observationsTemp[i].oPt.getX();
+            observations[OBSERV_DIM*i + 1] = observationsTemp[i].oPt.getY();
+        }
+
+        uint32_t nbLocalObservations = (uint32_t) observationsTemp.size();
+        uint32_t nbNeighbourObservations = (uint32_t) neighbourObservationsTemp.size();
+        // Add also neighbourhoud observations to Ceres if active
+        if (m_fixedNeighbourKeyframes)
+        {
+            for (uint32_t i = 0; i < (uint32_t) neighbourObservationsTemp.size(); i++)
+            {
+                extrinsicIndex[nbLocalObservations+i] = neighbourObservationsTemp[i].cIdx;
+                intrinsicIndex[nbLocalObservations+i] = neighbourObservationsTemp[i].cIdx;
+                pointIndex[nbLocalObservations+i] = neighbourObservationsTemp[i].pIdx;
+                observations[OBSERV_DIM*(nbLocalObservations+i) + 0] = neighbourObservationsTemp[i].oPt.getX();
+                observations[OBSERV_DIM*(nbLocalObservations+i) + 1] = neighbourObservationsTemp[i].oPt.getY();
+            }
+        }
+
+
+        // Fill the table of parameters to optimize by Ceres (Keyframe poses and intrinsics + cloud points)
+        uint32_t nbNeighbourKeyframes = (uint32_t) neighbourKeyframes.size();
+        uint32_t nbKeyframes = nbLocalKeyframes + nbNeighbourKeyframes;
+
+        uint32_t nbCloudPoint = (uint32_t) localCloudPoints.size();
+        uint32_t parametersSize = (EXT_DIM + INT_DIM) * nbKeyframes + POINT_DIM * nbCloudPoint;
+        double* parameters =  new double[parametersSize];
+
+        // Fill local Keyframes
+        for (uint32_t i = 0; i < nbLocalKeyframes; i++)
+        {
+            Transform3Df kfpose = localKeyframes[i]->getPose();
+            Vector3f r,t;
+
+            toRodrigues(kfpose,r);
+            kfpose = kfpose.inverse();
+
+            t[0] = kfpose(0, 3);
+            t[1] = kfpose(1, 3);
+            t[2] = kfpose(2, 3);
+
+            float fc = -1.0;
+            parameters[EXT_DIM*i + 0] = r[0] * fc;
+            parameters[EXT_DIM*i + 1] = r[1] * fc;
+            parameters[EXT_DIM*i + 2] = r[2] * fc;
+            parameters[EXT_DIM*i + 3] = t[0];
+            parameters[EXT_DIM*i + 4] = t[1];
+            parameters[EXT_DIM*i + 5] = t[2];
+
+
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 0] = K(0, 0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 1] = K(1, 1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 2] = K(0, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 3] = K(1, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 4] = D(0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 5] = D(1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 6] = D(2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 7] = D(3);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 8] = D(4);
+         }
+
+        // Fill neightbour Keyframes
+        for (int i = 0; i < nbNeighbourKeyframes; i++)
+        {
+            Transform3Df kfpose = neighbourKeyframes[i]->getPose();
+            Vector3f r,t;
+
+            toRodrigues(kfpose,r);
+            kfpose = kfpose.inverse();
+
+            t[0] = kfpose(0, 3);
+            t[1] = kfpose(1, 3);
+            t[2] = kfpose(2, 3);
+
+            float fc = -1.0;
+            parameters[EXT_DIM*(i+nbLocalKeyframes) + 0] = r[0] * fc;
+            parameters[EXT_DIM*(i+nbLocalKeyframes) + 1] = r[1] * fc;
+            parameters[EXT_DIM*(i+nbLocalKeyframes) + 2] = r[2] * fc;
+            parameters[EXT_DIM*(i+nbLocalKeyframes) + 3] = t[0];
+            parameters[EXT_DIM*(i+nbLocalKeyframes) + 4] = t[1];
+            parameters[EXT_DIM*(i+nbLocalKeyframes) + 5] = t[2];
+
+
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 0] = K(0, 0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 1] = K(1, 1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 2] = K(0, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 3] = K(1, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 4] = D(0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 5] = D(1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 6] = D(2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 7] = D(3);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 8] = D(4);
+         }
+
+        // Fill cloud point
+        for (uint32_t i = 0; i < nbCloudPoint; ++i)
+        {
+            parameters[nbKeyframes * (EXT_DIM + INT_DIM) + POINT_DIM*i + 0] = localCloudPoints[i]->getX();
+            parameters[nbKeyframes * (EXT_DIM + INT_DIM) + POINT_DIM*i + 1] = localCloudPoints[i]->getY();
+            parameters[nbKeyframes * (EXT_DIM + INT_DIM) + POINT_DIM*i + 2] = localCloudPoints[i]->getZ();
+        }
+
+
+        // Solve Ceres Problem
+        //--------------------
+        LOG_DEBUG("2. SOLVE CERES PROBLEM");
+        ceres::Problem problem;
+        for (uint32_t i = 0; i < nbObservations; ++i) {
+            ceres::CostFunction* cost_function = SolARReprojectionError::create(observations[OBSERV_DIM * i + 0],
+                observations[OBSERV_DIM * i + 1]);
+
+            problem.AddResidualBlock(cost_function,
+                                     NULL,
+                                     parameters + nbKeyframes * EXT_DIM + intrinsicIndex[i] * INT_DIM, // mutable_intrinsic_for_observation(i),
+                                     parameters + extrinsicIndex[i] * EXT_DIM, //mutable_extrinsic_for_observation(i),
+                                     parameters + (EXT_DIM + INT_DIM) * nbKeyframes + pointIndex[i] * POINT_DIM); //mutable_point_for_observation(i));
+        }
+
+        if (m_fixedKeyframes) {
+            for (uint32_t i = 0; i < nbLocalKeyframes; ++i)
+                problem.SetParameterBlockConstant(parameters + extrinsicIndex[i] * EXT_DIM);
+        }
+        else if (m_fixedFirstPose) {
+            problem.SetParameterBlockConstant(parameters + extrinsicIndex[0] * EXT_DIM);
+        }
+        if (m_fixedNeighbourKeyframes) {
+            for (uint32_t i = 0; i < nbNeighbourObservations; ++i)
+                problem.SetParameterBlockConstant(parameters + extrinsicIndex[i + nbLocalObservations] * EXT_DIM);
+        }
+        if (m_fixedIntrinsics) {
+            for (uint32_t i = 0; i < nbKeyframes; ++i)
+                problem.SetParameterBlockConstant(parameters + nbKeyframes * EXT_DIM + intrinsicIndex[i] * INT_DIM);
+        }
+        if (m_fixedMap) {
+            for (uint32_t i = 0; i < nbObservations; ++i)
+                problem.SetParameterBlockConstant(parameters + (EXT_DIM + INT_DIM) * nbKeyframes + pointIndex[i] * POINT_DIM);
+        }
+
+
+        ceres::Solver::Summary summary;
+
+        ceres::Solve(options, &problem, &summary);
+        LOG_DEBUG("Ceres Report: {}", summary.FullReport());
+
+        // Update Ceres Problem
+        //--------------------
+        LOG_DEBUG("3. UPDATE CERES PROBLEM");
+
+        // Update cloud points
+        if (!m_fixedMap)
+        {
+            for (uint32_t i = 0; i < (uint32_t)localCloudPoints.size(); i++) {
+                SRef<CloudPoint> cp = localCloudPoints[i];
+                cp->setX(parameters[nbKeyframes * (EXT_DIM + INT_DIM) + POINT_DIM*i + 0]);
+                cp->setY(parameters[nbKeyframes * (EXT_DIM + INT_DIM) + POINT_DIM*i + 1]);
+                cp->setZ(parameters[nbKeyframes * (EXT_DIM + INT_DIM) + POINT_DIM*i + 2]);
+                //cp->setReprojectionError(???);
+            }
+        }
+
+        if (!m_fixedKeyframes)
+        {
+            // Update keyframes
+            for (uint32_t i = 0; i < (uint32_t)localKeyframes.size(); i++)
+            {
+                SRef<Keyframe> kf = localKeyframes[i];
+                Vector3d r, t, f;
+                Transform3Df kf_pose;
+                r[0] = parameters[EXT_DIM*i + 0];
+                r[1] = parameters[EXT_DIM*i + 1];
+                r[2] = parameters[EXT_DIM*i + 2];
+
+                iRodrigues(r,kf_pose);
+
+                kf_pose(0,3) = parameters[EXT_DIM*i + 3];
+                kf_pose(1,3) = parameters[EXT_DIM*i + 4];
+                kf_pose(2,3) = parameters[EXT_DIM*i + 5];
+
+                kf_pose(3,0) = 0.0f;
+                kf_pose(3,1) = 0.0f;
+                kf_pose(3,2) = 0.0f;
+                kf_pose(3,3) = 1.0f;
+
+                kf_pose = kf_pose.inverse();
+
+                kf->setPose(kf_pose);
+            }
+        }
+
+        if (!m_fixedIntrinsics)
+        {
+            K(0,0) = parameters[nbKeyframes * EXT_DIM + 0];
+            K(1,1) = parameters[nbKeyframes * EXT_DIM + 1];
+            K(0,2) = parameters[nbKeyframes * EXT_DIM + 2];
+            K(1,2) = parameters[nbKeyframes * EXT_DIM + 3];
+
+            D(0) = parameters[nbKeyframes * EXT_DIM + 4];
+            D(1) = parameters[nbKeyframes * EXT_DIM + 5];
+            D(2) = parameters[nbKeyframes * EXT_DIM + 6];
+            D(3) = parameters[nbKeyframes * EXT_DIM + 7];
+            D(4) = parameters[nbKeyframes * EXT_DIM + 8];
+        }
+
+        return ((double)summary.final_cost / (double)nbCloudPoint);
+    }
+}
+}
 }

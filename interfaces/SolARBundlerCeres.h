@@ -3,8 +3,14 @@
 
 
 #include "api/solver/map/IBundler.h"
+#include "api/storage/ICovisibilityGraph.h"
+#include "api/storage/IKeyframesManager.h"
+#include "api/storage/IPointCloudManager.h"
+
 #include "xpcf/component/ConfigurableBase.h"
+
 #include "SolARCeresAPI.h"
+
 
 #include "ceres/ceres.h"
 #include "ceres/rotation.h"
@@ -20,6 +26,7 @@ namespace xpcf = org::bcom::xpcf;
 
 namespace SolAR {
 	using namespace datastructure;
+    using namespace api::storage;
 	namespace MODULES {
 		namespace CERES {
 
@@ -28,6 +35,11 @@ namespace SolAR {
 			 * @brief <B>Applies a bundle adjustment to optimize a 3D map and keyframes.</B>
 			 * <TT>UUID: 4897fc13-682c-4e95-8aba-abd9f7a17193</TT>
 			 *
+             * This Bundler component has to inject 3 storage components:
+             *         -IKeyframesManager
+             *         -IPointCloudManager
+             *         -ICovisibilityGraph
+             * The definition of the injection of this three storage components will have to be added in the xml configuration file of your application.
 			 */
 
 			class SOLARCERES_EXPORT_API SolARBundlerCeres : public org::bcom::xpcf::ConfigurableBase,
@@ -41,69 +53,34 @@ namespace SolAR {
 
 				/// @brief solve a non-linear problem related to bundle adjustement statement expressed as:
 				/// minArg(pts3ds,intrinsics,extrinsics) = MIN_cam_i(MIN_3d_j(pts2d_j - reproje(pt3ds_j,intrinsics_i,extrinsics_i)),
-				/// @param[in,out] framesToAdjust: contains a set of {2D points, camera extrinsics}.
-				/// @param[in,out] mapToAjust: contains a set of of 3D points .
-				/// @param[in] K: camera calibration parameters responsible of 3D points generation.
-				/// @param[in] D: camera distorsion parameters responsible of 3D points generation
-				/// K, D represent the camera intrinsic parameters
+                /// @param[in, out] K: camera calibration parameters responsible of 3D points generation.
+                /// @param[in, out] D: camera distorsion parameters responsible of 3D points generation.
 				/// @param[in] selectKeyframes : selected views to bundle following a given strategies (ex: poseGraph).
-				/// @return the mean re-projection error after {pts3d, intrinsic, extrinsic} correction.
-				double solve(const std::vector<SRef<Keyframe>> & originalKeyframes,
-					const std::vector<CloudPoint> & originalCloud,
-					const  CamCalibration & originalCalib,
-					const CamDistortion & originalDist,
-					const std::vector<int> & selectKeyframes,
-					std::vector<Transform3Df> & correctedPose,
-					std::vector<CloudPoint>&correctedCloud,
-					CamCalibration&correctedCalib,
-					CamDistortion &correctedDist) override;
-
-
+                double solve(CamCalibration &K,
+                             CamDistortion &D,
+                             const std::vector<uint32_t> & selectKeyframes) override;
 
 			private:
+                /// @brief number of mx iterations number.
+                unsigned int m_iterationsNo = 10;
+                /// @brief fixing map control.
+                unsigned int m_fixedMap = 0;
+                /// @brief fixing extrinsic control.
+                unsigned int m_fixedKeyframes = 0;
+                /// @brief fixing intrinsic control.
+                unsigned int m_fixedIntrinsics = 1;
+                /// @brief fixing first pose control.
+                unsigned int m_fixedFirstPose = 1;
+                /// @brief fixing neighbour keyframes control.
+                unsigned int m_fixedNeighbourKeyframes = 1;
+                /// @brief Maximum number of fixed neighbour keyframes.
+                unsigned int m_nbMaxFixedKeyframes = 100;
 
-				/// @brief initialize ceres solver parameters (iterations number, solver type, solver strategy..).
-				void initCeresProblem();
-				/// @brief solve ceres problem using a pre-definded solver parameters: 03 residual blocks are considered
-				///     a) mutable_extrinsic_for_observation(j): correspondant extrinsic parameters for a given observation.
-				///     b) mutable_intrinsic_for_observation(j): correspondant intrinsic parameters for a given observation.
-				///     c) mutable_point_for_observation(j):     correspondant pose for a given observation.
-				/// Each residual encodes a reprojection error ERROR(REPROJ(X_j, EXTR_j, INTR_j),x_) following SolARReprojectionError.
-				double solveCeresProblem();
-				/// @brief fill ceres internal data
-				/// @param[in] framesToAdjust: fills mutable_exteinsic_for_observation buffer.
-				/// @param[in] mapToAjust:     fills mutable_point_for_observation buffer .
-				/// @param[in] K:              fills mutable_intrinsic_for_observation buffer.
-				/// @param[in] D:              fills mutable_intrinsic_for_observation buffer
-				void fillCeresProblem(const std::vector<SRef<Keyframe>>&originalKeyframes,
-					const std::vector<CloudPoint> & originalCloud,
-					const CamCalibration &originalCalib,
-					const CamDistortion &originalDist,
-					const std::vector<int>&selectedKeyframes);
+                /// @brief reference to the storage component use to manage the point cloud.
+                SRef<IPointCloudManager>    m_pointCloudManager;
+                /// @brief reference to the storage component use to manage the keyframes.
+                SRef<IKeyframesManager>     m_keyframesManager;
 
-
-				/// @brief update all ceres problem variables.
-				/// @param[in] framesToAdjust: takes extrinsic parameters correction.
-				/// @param[in] mapToAjust:     takes 3D point correction .
-				/// @param[in] K:              takes intrinsic parameters correction.
-				/// @param[in] D:              takes intrinsic parameters correction.
-				void updateCeresProblem(const std::vector<CloudPoint> & originalCloud,
-					std::vector<CloudPoint> & correctedCloud,
-					std::vector<Transform3Df> & correctedPose,
-					CamCalibration &correctedCalib,
-					CamDistortion &correctedDist);
-
-				/// @brief update 3D point variable.
-				/// @param[in] mapToAjust:     takes 3D point correction .
-				void updateMap(const std::vector<CloudPoint> & originalCloud, std::vector<CloudPoint> & correctedCloud);
-				/// @brief update extrinsic parameters variable.
-				/// @param[in] framesToAdjust: takes extrinsic parameters correction.
-				void updateExtrinsic(std::vector<Transform3Df> & correctedPose);
-
-				/// @brief update intrinsic parameters variable.
-				/// @param[in] K:              takes intrinsic parameters correction.
-				/// @param[in] D:              takes intrinsic parameters correction.
-				void updateIntrinsic(CamCalibration &correctedCalib, CamDistortion &correctedDist);
 				/// @brief transform a rotation matrix to axis-anle representation using Rodrigue's formula.
 				/// @param[in]  R:              a pose transform matrix
 				/// @param[out] r:             rodrigues angles
@@ -219,88 +196,6 @@ namespace SolAR {
 
 					}
 				}
-
-				/// @return get the number of observations.
-				inline int num_observations()       const {
-					return m_observationsNo;
-				}
-				/// @return get the number of parameters.
-				inline int get_parameters()       const {
-					return m_parametersNo;
-				}
-				/// @return get the number of views.
-				inline int get_cameras()       const {
-					return m_camerasNo;
-				}
-				/// @return get the number of points.
-				inline int get_points()       const {
-					return m_pointsNo;
-				}
-				/// @return get tall the observations of the problem as a buffer.
-				inline const double* observations() const {
-					return m_observations;
-				}
-				/// @return get all the parameters of the problem as a buffer.
-				double* mutable_cameras() {
-					return m_parameters;
-				}
-				/// @return get all the 3D points of the problem as a buffer.
-				double* mutable_points() {
-					return m_parameters + (INT_DIM + EXT_DIM) * m_camerasNo;
-				}
-				/// @return get all intrinsic parameters of the problem as a buffer.
-				double* mutable_intrinsic() {
-					return m_parameters + (EXT_DIM)* m_camerasNo;
-				}
-				/// @return get the extrinsic parameters for a given observation_i as a buffer.
-				double * mutable_extrinsic_for_observation(int i) {
-					return mutable_cameras() + m_extrinsicIndex[i] * EXT_DIM;
-				}
-				/// @return get the intrinsic parameters for a given observation_i as a buffer.
-				double * mutable_intrinsic_for_observation(int i) {
-					return mutable_intrinsic() + m_intrinsicIndex[i] * INT_DIM;
-				}
-				/// @return get the 3D point for a given observation_i as a buffer.
-				double* mutable_point_for_observation(int i) {
-					return mutable_points() + m_pointIndex[i] * POINT_DIM;
-				}
-
-				/// @brief ceres problem containing residual blocks.
-			//                ceres::Problem m_problem;
-				/// @brief ceres problem options containing solver parameters.
-				ceres::Solver::Options m_options;
-				/// @brief ceres problem summary containing problem minimization evolution.
-				ceres::Solver::Summary m_summary;
-				/// @brief number of views.
-				int m_camerasNo;
-				/// @brief number of 3D points.
-				int m_pointsNo;
-				/// @brief number of 2D observations.
-				int m_observationsNo;
-				/// @brief number of residual parameters.
-				int m_parametersNo;
-				/// @brief 3D points indices buffer.
-				int* m_pointIndex;
-				/// @brief views indices buffer.
-				int* m_cameraIndex;
-				/// @brief extrinsic parameters buffer.
-				int * m_extrinsicIndex;
-				/// @brief intrinsic parameters buffer.
-				int * m_intrinsicIndex;
-				/// @brief observations buffer.
-				double* m_observations;
-				/// @brief residual parameters buffer.
-				double* m_parameters;
-				/// @brief number of mx iterations number.
-				unsigned int m_iterationsNo = 10;
-				/// @brief fixing map control.
-				unsigned int m_fixedMap = 0;
-				/// @brief fixing extrinsic control.
-				unsigned int m_fixedExtrinsics = 0;
-				/// @brief fixing intrinsic control.
-				unsigned int m_fixedIntrinsics = 1;
-				/// @brief fixing first pose control.
-				unsigned int m_holdFirstPose = 1;
 			};
 		}
 	}
