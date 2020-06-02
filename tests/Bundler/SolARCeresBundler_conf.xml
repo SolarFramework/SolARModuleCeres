@@ -41,6 +41,11 @@
             </property>
             <property name="fixedPointsColor" type="UnsignedInteger" value="1"/>
             <property name="pointsColor" type="UnsignedInteger">
+                    <value>255</value>
+                    <value>0</value>
+                    <value>0</value>
+            </property>
+            <property name="points2Color" type="UnsignedInteger">
                     <value>0</value>
                     <value>255</value>
                     <value>0</value>
@@ -63,9 +68,14 @@
                     <value>0</value>
             </property>
             <property name="keyframesColor" type="UnsignedInteger">
+                    <value>255</value>
                     <value>0</value>
+                    <value>0</value>
+            </property>
+            <property name="keyframes2Color" type="UnsignedInteger">
                     <value>0</value>
                     <value>255</value>
+                    <value>0</value>
             </property>
             <property name="zoomSensitivity" type="Float" value="10.0"/>
             <property name="exitKey" type="Integer" value="27"/>
@@ -76,7 +86,7 @@
             <property name="fixedKeyframes" type="UnsignedInteger" value="0"/>
             <property name="fixedIntrinsics" type="UnsignedInteger" value="1"/>
             <property name="fixedFirstPose" type="UnsignedInteger" value="1"/>
-            <property name="fixedNeighbourKeyframes" type="UnsignedInteger" value="0"/>
+            <property name="fixedNeighbourKeyframes" type="UnsignedInteger" value="1"/>
         </configure>	
     </properties>
 </xpcf-registry>

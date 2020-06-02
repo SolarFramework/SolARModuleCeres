@@ -216,12 +216,18 @@ int main(int argc, char ** argv) {
     std::vector<SRef<CloudPoint>> refPointCloud;
     pointCloudManager->getAllPoints(refPointCloud);
 
-    // get point cloud and keyframe poses before BA to display
+    // get keyframe poses before BA to display
     std::vector<Transform3Df> keyframePosesBefore;
     std::vector<uint32_t> selectedKeyframes;
     for (auto const &it : keyframes) {
         selectedKeyframes.push_back(it->getId());
         keyframePosesBefore.push_back(it->getPose());
+    }
+
+    // get point cloud before BA to display
+    std::vector<SRef<CloudPoint>> pointCloudBefore;
+    for (auto const &it : refPointCloud) {
+        pointCloudBefore.push_back(xpcf::utils::make_shared<CloudPoint>(it->getX(), it->getY(), it->getZ()));
     }
 
     LOG_INFO("Number of keyframes: {}", keyframes.size());
@@ -238,12 +244,13 @@ int main(int argc, char ** argv) {
     for (auto const &it : keyframes) {
         keyframePosesAfter.push_back(it->getPose());
     }
+
     LOG_INFO("Map after bundle adjustment");
     LOG_INFO("Keyframe1 pose after: \n{}", keyframePosesAfter[1].matrix());
     LOG_INFO("Point cloud 1 after: \n{}", *refPointCloud[1]);
 
     while (true) {
-        if (viewer3DPoints->display(refPointCloud, keyframePosesAfter[0], keyframePosesAfter) == FrameworkReturnCode::_STOP) {
+        if (viewer3DPoints->display(refPointCloud, keyframePosesAfter[0], keyframePosesAfter, {}, pointCloudBefore, keyframePosesBefore) == FrameworkReturnCode::_STOP) {
             break;
         }
     }
