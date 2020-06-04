@@ -57,7 +57,7 @@ namespace CERES {
     }
 
     struct SolARReprojectionError {
-        SolARReprojectionError(double observed_x, double observed_y) : observed_x(observed_x), observed_y(observed_y) {}
+		SolARReprojectionError(double observed_x, double observed_y) : observed_x(observed_x), observed_y(observed_y) {}
         template <typename T>
         bool operator()(const T* const cameraIntr,
             const T* const cameraExtr,
@@ -109,8 +109,18 @@ namespace CERES {
             return (new ceres::AutoDiffCostFunction<SolARReprojectionError, 2, 9, 6, 3>(
                 new SolARReprojectionError(observed_x, observed_y)));
         }
+
+		double squaredError() {	
+			double res[2];
+			operator()(intr, ext, pt, res);
+			return res[0] * res[0] + res[1] * res[1];
+		}
+
         double observed_x;
         double observed_y;
+		double * intr;
+		double * ext;
+		double * pt;
     };
     struct ceresObserv {
         int cIdx;
@@ -416,15 +426,21 @@ namespace CERES {
         //--------------------
         LOG_DEBUG("2. SOLVE CERES PROBLEM");
         ceres::Problem problem;
+		std::vector<SolARReprojectionError*> vReprojError;
         for (uint32_t i = 0; i < nbObservations; ++i) {
-            ceres::CostFunction* cost_function = SolARReprojectionError::create(observations[OBSERV_DIM * i + 0],
-                observations[OBSERV_DIM * i + 1]);
+			SolARReprojectionError* reprojError = new SolARReprojectionError(observations[OBSERV_DIM * i + 0],
+				observations[OBSERV_DIM * i + 1]);
 
+			ceres::CostFunction*cost_function = new ceres::AutoDiffCostFunction<SolARReprojectionError, 2, 9, 6, 3>(reprojError);		
             problem.AddResidualBlock(cost_function,
                                      NULL,
                                      parameters + nbKeyframes * EXT_DIM + intrinsicIndex[i] * INT_DIM, // mutable_intrinsic_for_observation(i),
                                      parameters + extrinsicIndex[i] * EXT_DIM, //mutable_extrinsic_for_observation(i),
                                      parameters + (EXT_DIM + INT_DIM) * nbKeyframes + pointIndex[i] * POINT_DIM); //mutable_point_for_observation(i));
+			reprojError->intr = parameters + nbKeyframes * EXT_DIM + intrinsicIndex[i] * INT_DIM;
+			reprojError->ext = parameters + extrinsicIndex[i] * EXT_DIM;
+			reprojError->pt = parameters + (EXT_DIM + INT_DIM) * nbKeyframes + pointIndex[i] * POINT_DIM;
+			vReprojError.push_back(reprojError);
         }
 
         if (m_fixedKeyframes) {
@@ -447,16 +463,14 @@ namespace CERES {
                 problem.SetParameterBlockConstant(parameters + (EXT_DIM + INT_DIM) * nbKeyframes + pointIndex[i] * POINT_DIM);
         }
 
-
         ceres::Solver::Summary summary;
 
         ceres::Solve(options, &problem, &summary);
-        LOG_DEBUG("Ceres Report: {}", summary.FullReport());
-
+        LOG_DEBUG("Ceres Report: {}", summary.FullReport());		
         // Update Ceres Problem
         //--------------------
         LOG_DEBUG("3. UPDATE CERES PROBLEM");
-
+		
         // Update cloud points
         if (!m_fixedMap)
         {
@@ -512,7 +526,12 @@ namespace CERES {
             D(4) = parameters[nbKeyframes * EXT_DIM + 8];
         }
 
-        return ((double)summary.final_cost / (double)nbCloudPoint);
+		// get the final mean squared reprojection error
+		double errorReproj(0.0);
+		for (const auto &it : vReprojError) {
+			errorReproj += it->squaredError();
+		}
+        return errorReproj / nbObservations;
     }
 }
 }
