@@ -185,6 +185,7 @@ namespace CERES {
         // Local KeyPoints
         std::vector<SRef<CloudPoint>> localCloudPoints;
         std::map<uint32_t, uint32_t> solar2CeresCloudPointID;
+        std::map<uint32_t, uint32_t> ceres2SolarCloudPointID;
 
 
         if (selectedKeyframes.size() > 0)
@@ -209,6 +210,7 @@ namespace CERES {
                         //insert its id in the SolAR/Ceres cloud point id correspondences map
                         ceresCloudPointID = (uint32_t)localCloudPoints.size();
                         solar2CeresCloudPointID.insert(std::pair<uint32_t, uint32_t>(it_kpId2cpIdVisibility.second, ceresCloudPointID));
+						ceres2SolarCloudPointID.insert(std::pair<uint32_t, uint32_t>(ceresCloudPointID, it_kpId2cpIdVisibility.second));
 
                         //add the point cloud to the vector of PointCloud
                         localCloudPoints.push_back(localCloudPoint);
@@ -530,6 +532,18 @@ namespace CERES {
 		double errorReproj(0.0);
 		for (const auto &it : vReprojError) {
 			errorReproj += it->squaredError();
+		}
+
+		//Update re-projection error of point cloud
+		std::map<uint32_t, std::vector<double>> projErrors;
+		for (int i = 0; i < vReprojError.size(); i++) {
+			uint32_t cloudPoint_id = ceres2SolarCloudPointID[pointIndex[i]];
+			projErrors[cloudPoint_id].push_back(std::sqrt(vReprojError[i]->squaredError()));
+		}
+		for (const auto &it : projErrors) {
+			SRef<CloudPoint> mapPoint;
+			m_pointCloudManager->getPoint(it.first, mapPoint);
+			mapPoint->setReprojError(std::accumulate(it.second.begin(), it.second.end(), 0.0) / it.second.size());
 		}
         return errorReproj / nbObservations;
     }
