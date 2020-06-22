@@ -149,7 +149,7 @@ namespace CERES {
         LOG_DEBUG(" SolARBundlerCeres constructor");
     }
 
-    double SolARBundlerCeres::solve(CamCalibration & K,
+    double SolARBundlerCeres::localBundleAdjustment(CamCalibration & K,
                                     CamDistortion & D,
                                     const std::vector<uint32_t> & selectedKeyframes) {
 
@@ -547,6 +547,412 @@ namespace CERES {
 		}
         return errorReproj / nbObservations;
     }
+
+    double SolARBundlerCeres::globalBundleAdjustment(CamCalibration & K,
+                                    CamDistortion & D) {
+
+        // Init Ceres Problem
+        // ------------------
+
+        LOG_DEBUG("0. INIT CERES PROBLEM");
+        ceres::Solver::Options options;
+        options.use_nonmonotonic_steps = true;
+        options.preconditioner_type = ceres::SCHUR_JACOBI;
+        options.linear_solver_type = ceres::ITERATIVE_SCHUR;
+        options.use_inner_iterations = true;
+        options.max_num_iterations = m_iterationsNo;
+        options.minimizer_progress_to_stdout = false;
+
+        LOG_DEBUG("ITERATIONS NO: {}", m_iterationsNo);
+        LOG_DEBUG("MAP FIXED ? {}", (bool)m_fixedMap);
+        LOG_DEBUG("EXTRINSICS FIXED ? {}", (bool)m_fixedKeyframes);
+        LOG_DEBUG("INTRINSICS FIXED ? {}", (bool)m_fixedIntrinsics);
+        LOG_DEBUG("FIRST POSE FIXED ? {}", (bool)m_fixedFirstPose);
+        LOG_DEBUG("NEIGHBOUR KEYFRAMES FIXED ? {}", (bool)m_fixedNeighbourKeyframes);
+
+
+        // Fill Ceres Problem
+        // ------------------
+        LOG_DEBUG("1. FILL CERES PROBLEM");
+        vector<ceresObserv> observationsTemp;
+
+        // Local KeyFrames
+        std::vector< SRef<Keyframe>> localKeyframes;
+        std::map<uint32_t, uint32_t> solar2CeresKeyframeID;
+
+        // Local KeyPoints
+        std::vector<SRef<CloudPoint>> localCloudPoints;
+        std::map<uint32_t, uint32_t> solar2CeresCloudPointID;
+        std::map<uint32_t, uint32_t> ceres2SolarCloudPointID;
+
+        /* TODO use all key frames
+        if (selectedKeyframes.size() > 0)
+        {
+            // Fill the local keyframeid set
+            for (auto skf_id : selectedKeyframes) {
+                SRef<Keyframe> localKeyframe;
+                m_keyframesManager->getKeyframe(skf_id, localKeyframe);
+                int ceresKeyframeID = (int)localKeyframes.size();
+                solar2CeresKeyframeID.insert(std::pair<uint32_t, uint32_t>(skf_id, ceresKeyframeID));
+                localKeyframes.push_back(localKeyframe);
+                const std::map<uint32_t, uint32_t>& mapPointVisibility = localKeyframe->getVisibility();
+
+                for (auto const &it_kpId2cpIdVisibility : mapPointVisibility) {
+                    SRef<CloudPoint> localCloudPoint;
+                    m_pointCloudManager->getPoint(it_kpId2cpIdVisibility.second, localCloudPoint);
+                    // Check if the solar point has already been added the set of cloud point
+                    std::map<uint32_t, uint32_t>::iterator itCeresCPIdCorresp = solar2CeresCloudPointID.find(it_kpId2cpIdVisibility.second);
+                    uint32_t ceresCloudPointID;
+                    if (itCeresCPIdCorresp==solar2CeresCloudPointID.end())
+                    {
+                        //insert its id in the SolAR/Ceres cloud point id correspondences map
+                        ceresCloudPointID = (uint32_t)localCloudPoints.size();
+                        solar2CeresCloudPointID.insert(std::pair<uint32_t, uint32_t>(it_kpId2cpIdVisibility.second, ceresCloudPointID));
+                        ceres2SolarCloudPointID.insert(std::pair<uint32_t, uint32_t>(ceresCloudPointID, it_kpId2cpIdVisibility.second));
+
+                        //add the point cloud to the vector of PointCloud
+                        localCloudPoints.push_back(localCloudPoint);
+                    }
+                    else
+                        ceresCloudPointID = itCeresCPIdCorresp->second;
+
+                    //create and add the observation
+                    ceresObserv observTemp;
+                    observTemp.cIdx = ceresKeyframeID;
+                    observTemp.pIdx = ceresCloudPointID;
+                    Keypoint kp = localKeyframe->getKeypoint(it_kpId2cpIdVisibility.first);
+                    observTemp.oPt = Point2Df(kp.getX(), kp.getY());
+                    observationsTemp.push_back(observTemp);
+                }
+            }
+        }
+        else
+        {
+            // Fill the local keyframeid set
+            vector<SRef<Keyframe>> keyframes;
+            m_keyframesManager->getAllKeyframes(keyframes);
+            for (auto localKeyframe : keyframes) {
+                int ceresKeyframeID = (int)localKeyframes.size();
+                solar2CeresKeyframeID.insert(std::pair<uint32_t, uint32_t>(localKeyframe->getId(), ceresKeyframeID));
+                localKeyframes.push_back(localKeyframe);
+                const std::map<uint32_t, uint32_t>& mapPointVisibility = localKeyframe->getVisibility();
+
+                for (auto const &it_kpId2cpIdVisibility : mapPointVisibility) {
+                    SRef<CloudPoint> localCloudPoint;
+                    m_pointCloudManager->getPoint(it_kpId2cpIdVisibility.second, localCloudPoint);
+                    // Check if the solar point has already been added the set of cloud point
+                    std::map<uint32_t, uint32_t>::iterator itCeresCPIdCorresp = solar2CeresCloudPointID.find(it_kpId2cpIdVisibility.second);
+                    uint32_t ceresCloudPointID;
+                    if (itCeresCPIdCorresp==solar2CeresCloudPointID.end())
+                    {
+                        //insert its id in the SolAR/Ceres cloud point id correspondences map
+                        ceresCloudPointID = (uint32_t)localCloudPoints.size();
+                        solar2CeresCloudPointID.insert(std::pair<uint32_t, uint32_t>(it_kpId2cpIdVisibility.second, ceresCloudPointID));
+
+                        //add the point cloud to the vector of PointCloud
+                        localCloudPoints.push_back(localCloudPoint);
+                    }
+                    else
+                        ceresCloudPointID = itCeresCPIdCorresp->second;
+
+                    //create and add the observation
+                    ceresObserv observTemp;
+                    observTemp.cIdx = ceresKeyframeID;
+                    observTemp.pIdx = ceresCloudPointID;
+                    Keypoint kp = localKeyframe->getKeypoint(it_kpId2cpIdVisibility.first);
+                    observTemp.oPt = Point2Df(kp.getX(), kp.getY());
+                    observationsTemp.push_back(observTemp);
+                }
+            }
+        }
+
+        */
+
+        uint32_t nbLocalKeyframes = (uint32_t) localKeyframes.size();
+
+
+        // Fixed Keyframes. Keyframes in the neighbourhood of the Local keyframes that see Local MapPoints but that are not Local Keyframes
+        std::map<uint32_t, uint32_t> solar2CeresNeighbourKeyframeID;
+        vector<SRef<Keyframe>> neighbourKeyframes;
+        vector<ceresObserv> neighbourObservationsTemp;
+
+        if (m_fixedNeighbourKeyframes)
+        {
+            // For al cloudPoint to optimize, search for keyframes viewing them, but not is the selected keyframes
+            for (auto const cp : localCloudPoints)
+            {
+                const std::map<uint32_t, uint32_t> &kpVisibility = cp->getVisibility();
+                for (auto const &it_kfIDkpIDVisibility : kpVisibility)
+                {
+                    uint32_t ceresNeighbourKFid;
+                    if (solar2CeresKeyframeID.find(it_kfIDkpIDVisibility.first) == solar2CeresKeyframeID.end())
+                     {
+                        ceresNeighbourKFid = nbLocalKeyframes + (uint32_t)solar2CeresNeighbourKeyframeID.size();
+                        solar2CeresNeighbourKeyframeID.insert(std::pair<uint32_t, uint32_t>(it_kfIDkpIDVisibility.first, ceresNeighbourKFid));
+
+                        SRef<Keyframe> neighbourKF;
+                        m_keyframesManager->getKeyframe(it_kfIDkpIDVisibility.first, neighbourKF);
+                        //create and add the observation
+                        std::map<uint32_t, uint32_t>::iterator it_solar2CeresCPid = solar2CeresCloudPointID.find(cp->getId());
+                        if (it_solar2CeresCPid != solar2CeresCloudPointID.end())
+                        {
+                            ceresObserv neighbourObservTemp;
+                            neighbourObservTemp.cIdx = ceresNeighbourKFid;
+                            neighbourObservTemp.pIdx = it_solar2CeresCPid->second;
+                            Keypoint kp = neighbourKF->getKeypoint(it_kfIDkpIDVisibility.second);
+                            neighbourObservTemp.oPt = Point2Df(kp.getX(), kp.getY());
+
+                            neighbourObservationsTemp.push_back(neighbourObservTemp);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Fill in Local Keyframe observations
+        uint32_t nbObservations = (uint32_t)observationsTemp.size() + (uint32_t) neighbourObservationsTemp.size();
+        double* observations = new double[OBSERV_DIM * nbObservations];
+        int*    pointIndex = new int[nbObservations];
+        int*    extrinsicIndex = new int[nbObservations];
+        int*    intrinsicIndex = new int[nbObservations];
+
+        // Add Local observations to Ceres
+        for (uint32_t i = 0; i < (uint32_t) observationsTemp.size(); i++)
+        {
+            extrinsicIndex[i] = observationsTemp[i].cIdx;
+            intrinsicIndex[i] = observationsTemp[i].cIdx;
+            pointIndex[i] = observationsTemp[i].pIdx;
+            observations[OBSERV_DIM*i + 0] = observationsTemp[i].oPt.getX();
+            observations[OBSERV_DIM*i + 1] = observationsTemp[i].oPt.getY();
+        }
+
+        uint32_t nbLocalObservations = (uint32_t) observationsTemp.size();
+        uint32_t nbNeighbourObservations = (uint32_t) neighbourObservationsTemp.size();
+        // Add also neighbourhoud observations to Ceres if active
+        if (m_fixedNeighbourKeyframes)
+        {
+            for (uint32_t i = 0; i < (uint32_t) neighbourObservationsTemp.size(); i++)
+            {
+                extrinsicIndex[nbLocalObservations+i] = neighbourObservationsTemp[i].cIdx;
+                intrinsicIndex[nbLocalObservations+i] = neighbourObservationsTemp[i].cIdx;
+                pointIndex[nbLocalObservations+i] = neighbourObservationsTemp[i].pIdx;
+                observations[OBSERV_DIM*(nbLocalObservations+i) + 0] = neighbourObservationsTemp[i].oPt.getX();
+                observations[OBSERV_DIM*(nbLocalObservations+i) + 1] = neighbourObservationsTemp[i].oPt.getY();
+            }
+        }
+
+
+        // Fill the table of parameters to optimize by Ceres (Keyframe poses and intrinsics + cloud points)
+        uint32_t nbNeighbourKeyframes = (uint32_t) neighbourKeyframes.size();
+        uint32_t nbKeyframes = nbLocalKeyframes + nbNeighbourKeyframes;
+
+        uint32_t nbCloudPoint = (uint32_t) localCloudPoints.size();
+        uint32_t parametersSize = (EXT_DIM + INT_DIM) * nbKeyframes + POINT_DIM * nbCloudPoint;
+        double* parameters =  new double[parametersSize];
+
+        // Fill local Keyframes
+        for (uint32_t i = 0; i < nbLocalKeyframes; i++)
+        {
+            Transform3Df kfpose = localKeyframes[i]->getPose();
+            Vector3f r,t;
+
+            toRodrigues(kfpose,r);
+            kfpose = kfpose.inverse();
+
+            t[0] = kfpose(0, 3);
+            t[1] = kfpose(1, 3);
+            t[2] = kfpose(2, 3);
+
+            float fc = -1.0;
+            parameters[EXT_DIM*i + 0] = r[0] * fc;
+            parameters[EXT_DIM*i + 1] = r[1] * fc;
+            parameters[EXT_DIM*i + 2] = r[2] * fc;
+            parameters[EXT_DIM*i + 3] = t[0];
+            parameters[EXT_DIM*i + 4] = t[1];
+            parameters[EXT_DIM*i + 5] = t[2];
+
+
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 0] = K(0, 0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 1] = K(1, 1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 2] = K(0, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 3] = K(1, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 4] = D(0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 5] = D(1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 6] = D(2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 7] = D(3);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 8] = D(4);
+         }
+
+        // Fill neightbour Keyframes
+        for (int i = 0; i < nbNeighbourKeyframes; i++)
+        {
+            Transform3Df kfpose = neighbourKeyframes[i]->getPose();
+            Vector3f r,t;
+
+            toRodrigues(kfpose,r);
+            kfpose = kfpose.inverse();
+
+            t[0] = kfpose(0, 3);
+            t[1] = kfpose(1, 3);
+            t[2] = kfpose(2, 3);
+
+            float fc = -1.0;
+            parameters[EXT_DIM*(i+nbLocalKeyframes) + 0] = r[0] * fc;
+            parameters[EXT_DIM*(i+nbLocalKeyframes) + 1] = r[1] * fc;
+            parameters[EXT_DIM*(i+nbLocalKeyframes) + 2] = r[2] * fc;
+            parameters[EXT_DIM*(i+nbLocalKeyframes) + 3] = t[0];
+            parameters[EXT_DIM*(i+nbLocalKeyframes) + 4] = t[1];
+            parameters[EXT_DIM*(i+nbLocalKeyframes) + 5] = t[2];
+
+
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 0] = K(0, 0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 1] = K(1, 1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 2] = K(0, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 3] = K(1, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 4] = D(0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 5] = D(1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 6] = D(2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 7] = D(3);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 8] = D(4);
+         }
+
+        // Fill cloud point
+        for (uint32_t i = 0; i < nbCloudPoint; ++i)
+        {
+            parameters[nbKeyframes * (EXT_DIM + INT_DIM) + POINT_DIM*i + 0] = localCloudPoints[i]->getX();
+            parameters[nbKeyframes * (EXT_DIM + INT_DIM) + POINT_DIM*i + 1] = localCloudPoints[i]->getY();
+            parameters[nbKeyframes * (EXT_DIM + INT_DIM) + POINT_DIM*i + 2] = localCloudPoints[i]->getZ();
+        }
+
+
+        // Solve Ceres Problem
+        //--------------------
+        LOG_DEBUG("2. SOLVE CERES PROBLEM");
+        ceres::Problem problem;
+        std::vector<SolARReprojectionError*> vReprojError;
+        for (uint32_t i = 0; i < nbObservations; ++i) {
+            SolARReprojectionError* reprojError = new SolARReprojectionError(observations[OBSERV_DIM * i + 0],
+                observations[OBSERV_DIM * i + 1]);
+
+            ceres::CostFunction*cost_function = new ceres::AutoDiffCostFunction<SolARReprojectionError, 2, 9, 6, 3>(reprojError);
+            problem.AddResidualBlock(cost_function,
+                                     NULL,
+                                     parameters + nbKeyframes * EXT_DIM + intrinsicIndex[i] * INT_DIM, // mutable_intrinsic_for_observation(i),
+                                     parameters + extrinsicIndex[i] * EXT_DIM, //mutable_extrinsic_for_observation(i),
+                                     parameters + (EXT_DIM + INT_DIM) * nbKeyframes + pointIndex[i] * POINT_DIM); //mutable_point_for_observation(i));
+            reprojError->intr = parameters + nbKeyframes * EXT_DIM + intrinsicIndex[i] * INT_DIM;
+            reprojError->ext = parameters + extrinsicIndex[i] * EXT_DIM;
+            reprojError->pt = parameters + (EXT_DIM + INT_DIM) * nbKeyframes + pointIndex[i] * POINT_DIM;
+            vReprojError.push_back(reprojError);
+        }
+
+        if (m_fixedKeyframes) {
+            for (uint32_t i = 0; i < nbLocalKeyframes; ++i)
+                problem.SetParameterBlockConstant(parameters + extrinsicIndex[i] * EXT_DIM);
+        }
+        else if (m_fixedFirstPose) {
+            problem.SetParameterBlockConstant(parameters + extrinsicIndex[0] * EXT_DIM);
+        }
+        if (m_fixedNeighbourKeyframes) {
+            for (uint32_t i = 0; i < nbNeighbourObservations; ++i)
+                problem.SetParameterBlockConstant(parameters + extrinsicIndex[i + nbLocalObservations] * EXT_DIM);
+        }
+        if (m_fixedIntrinsics) {
+            for (uint32_t i = 0; i < nbKeyframes; ++i)
+                problem.SetParameterBlockConstant(parameters + nbKeyframes * EXT_DIM + intrinsicIndex[i] * INT_DIM);
+        }
+        if (m_fixedMap) {
+            for (uint32_t i = 0; i < nbObservations; ++i)
+                problem.SetParameterBlockConstant(parameters + (EXT_DIM + INT_DIM) * nbKeyframes + pointIndex[i] * POINT_DIM);
+        }
+
+        ceres::Solver::Summary summary;
+
+        ceres::Solve(options, &problem, &summary);
+        LOG_DEBUG("Ceres Report: {}", summary.FullReport());
+        // Update Ceres Problem
+        //--------------------
+        LOG_DEBUG("3. UPDATE CERES PROBLEM");
+
+        // Update cloud points
+        if (!m_fixedMap)
+        {
+            for (uint32_t i = 0; i < (uint32_t)localCloudPoints.size(); i++) {
+                SRef<CloudPoint> cp = localCloudPoints[i];
+                cp->setX(parameters[nbKeyframes * (EXT_DIM + INT_DIM) + POINT_DIM*i + 0]);
+                cp->setY(parameters[nbKeyframes * (EXT_DIM + INT_DIM) + POINT_DIM*i + 1]);
+                cp->setZ(parameters[nbKeyframes * (EXT_DIM + INT_DIM) + POINT_DIM*i + 2]);
+                //cp->setReprojectionError(???);
+            }
+        }
+
+        if (!m_fixedKeyframes)
+        {
+            // Update keyframes
+            for (uint32_t i = 0; i < (uint32_t)localKeyframes.size(); i++)
+            {
+                SRef<Keyframe> kf = localKeyframes[i];
+                Vector3d r, t, f;
+                Transform3Df kf_pose;
+                r[0] = parameters[EXT_DIM*i + 0];
+                r[1] = parameters[EXT_DIM*i + 1];
+                r[2] = parameters[EXT_DIM*i + 2];
+
+                iRodrigues(r,kf_pose);
+
+                kf_pose(0,3) = parameters[EXT_DIM*i + 3];
+                kf_pose(1,3) = parameters[EXT_DIM*i + 4];
+                kf_pose(2,3) = parameters[EXT_DIM*i + 5];
+
+                kf_pose(3,0) = 0.0f;
+                kf_pose(3,1) = 0.0f;
+                kf_pose(3,2) = 0.0f;
+                kf_pose(3,3) = 1.0f;
+
+                kf_pose = kf_pose.inverse();
+
+                kf->setPose(kf_pose);
+            }
+        }
+
+        if (!m_fixedIntrinsics)
+        {
+            K(0,0) = parameters[nbKeyframes * EXT_DIM + 0];
+            K(1,1) = parameters[nbKeyframes * EXT_DIM + 1];
+            K(0,2) = parameters[nbKeyframes * EXT_DIM + 2];
+            K(1,2) = parameters[nbKeyframes * EXT_DIM + 3];
+
+            D(0) = parameters[nbKeyframes * EXT_DIM + 4];
+            D(1) = parameters[nbKeyframes * EXT_DIM + 5];
+            D(2) = parameters[nbKeyframes * EXT_DIM + 6];
+            D(3) = parameters[nbKeyframes * EXT_DIM + 7];
+            D(4) = parameters[nbKeyframes * EXT_DIM + 8];
+        }
+
+        // get the final mean squared reprojection error
+        double errorReproj(0.0);
+        for (const auto &it : vReprojError) {
+            errorReproj += it->squaredError();
+        }
+
+        //Update re-projection error of point cloud
+        std::map<uint32_t, std::vector<double>> projErrors;
+        for (int i = 0; i < vReprojError.size(); i++) {
+            uint32_t cloudPoint_id = ceres2SolarCloudPointID[pointIndex[i]];
+            projErrors[cloudPoint_id].push_back(std::sqrt(vReprojError[i]->squaredError()));
+        }
+        for (const auto &it : projErrors) {
+            SRef<CloudPoint> mapPoint;
+            m_pointCloudManager->getPoint(it.first, mapPoint);
+            mapPoint->setReprojError(std::accumulate(it.second.begin(), it.second.end(), 0.0) / it.second.size());
+        }
+        return errorReproj / nbObservations;
+    }
+
+
+
+
+
 }
 }
 }
