@@ -27,6 +27,7 @@
 #include "api/solver/map/IBundler.h"
 #include "api/storage/IKeyframesManager.h"
 #include "api/storage/IPointCloudManager.h"
+#include "api/storage/ICovisibilityGraph.h"
 #include "core/Log.h"
 
 using namespace SolAR;
@@ -53,6 +54,7 @@ int main(int argc, char ** argv) {
 
     auto pointCloudManager = xpcfComponentManager->resolve<IPointCloudManager>();
     auto keyframesManager = xpcfComponentManager->resolve<IKeyframesManager>();
+    auto covisibilityGraph = xpcfComponentManager->resolve<ICovisibilityGraph>();
     auto bundler = xpcfComponentManager->resolve<api::solver::map::IBundler>();
     auto viewer3DPoints = xpcfComponentManager->resolve<display::I3DPointsViewer>();
 
@@ -237,7 +239,7 @@ int main(int argc, char ** argv) {
     LOG_INFO("Point cloud 1 before: \n{}", *refPointCloud[1]);
 
     LOG_INFO("Run bundle adjustment");
-    double reproj_errorFinal = bundler->localBundleAdjustment(intrinsic, distortion, selectedKeyframes);
+	double reproj_errorFinal = bundler->bundleAdjustment(intrinsic, distortion, selectedKeyframes);
     LOG_INFO("Reprojection error final: {}", reproj_errorFinal);
 
     std::vector<Transform3Df> keyframePosesAfter;
