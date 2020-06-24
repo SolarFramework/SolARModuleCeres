@@ -95,7 +95,6 @@ int main(int argc, char ** argv) {
 	LOG_INFO("Number of keyframes: {}", keyframes.size());
 	LOG_INFO("Number of point cloud: {}", refPointCloud.size());
 
-	LOG_INFO("Keyframe0 pose before: \n{}", keyframePosesBefore[0].matrix());
 	LOG_INFO("Keyframe1 pose before: \n{}", keyframePosesBefore[1].matrix());
 	LOG_INFO("Point cloud 1 before: \n{}", *refPointCloud[1]);
 
@@ -104,8 +103,8 @@ int main(int argc, char ** argv) {
 	start = clock();
 	bool useSpanningTree = true;
 	// uncomment the line below to deactivate useSpanningTree
-	//useSpanningTree = false;
-	double reproj_errorFinal = bundler->bundleAdjustment(calibration, distortion, {}, useSpanningTree);
+	//bundler->bindTo<xpcf::IConfigurable>()->getProperty("useSpanningTree")->setIntegerValue(0);
+	double reproj_errorFinal = bundler->bundleAdjustment(calibration, distortion);
 	end = clock();
 	double duration = double(end - start) / CLOCKS_PER_SEC;
 	LOG_INFO("Execution time : {}", duration);
@@ -116,7 +115,6 @@ int main(int argc, char ** argv) {
 		keyframePosesAfter.push_back(it->getPose());
 	}
 	LOG_INFO("Map after bundle adjustment");
-	LOG_INFO("Keyframe0 pose after: \n{}", keyframePosesAfter[0].matrix());
 	LOG_INFO("Keyframe1 pose after: \n{}", keyframePosesAfter[1].matrix());
 	LOG_INFO("Point cloud 1 after: \n{}", *refPointCloud[1]);
 	

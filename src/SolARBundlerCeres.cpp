@@ -147,10 +147,11 @@ namespace CERES {
         declareProperty("fixedFirstPose", m_fixedFirstPose);
         declareProperty("fixedNeighbourKeyframes", m_fixedNeighbourKeyframes);
         declareProperty("nbMaxFixedKeyframes", m_nbMaxFixedKeyframes);
+		declareProperty("useSpanningTree", m_useSpanningTree);
         LOG_DEBUG(" SolARBundlerCeres constructor");
     }
 
-	double SolARBundlerCeres::bundleAdjustment(CamCalibration & K, CamDistortion & D, const std::vector<uint32_t>& selectedKeyframes, const bool & useSpanningTree) {
+	double SolARBundlerCeres::bundleAdjustment(CamCalibration & K, CamDistortion & D, const std::vector<uint32_t> & selectedKeyframes) {
 
         // Init Ceres Problem
         // ------------------
@@ -228,7 +229,7 @@ namespace CERES {
             }
         }
 		/// Global bundle adjustment based on spanning tree
-		else if (useSpanningTree) {
+		else if (m_useSpanningTree) {
 			// get all keyframes
 			std::vector<SRef<Keyframe>> keyframes;
 			m_keyframesManager->getAllKeyframes(keyframes);

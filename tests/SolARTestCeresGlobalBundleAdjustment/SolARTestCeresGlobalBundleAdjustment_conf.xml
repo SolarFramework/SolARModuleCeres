@@ -73,6 +73,7 @@
             <property name="fixedIntrinsics" type="UnsignedInteger" value="1"/>
             <property name="fixedFirstPose" type="UnsignedInteger" value="1"/>
             <property name="fixedNeighbourKeyframes" type="UnsignedInteger" value="1"/>
+			<property name="useSpanningTree" type="Integer" value="1"/>
         </configure>
 		<configure component="SolAR3DPointsViewerOpengl">
             <property name="title" type="string" value="Points Cloud - Green = origin, Red = optimized (Press esc to exit)"/>
