@@ -1,2 +1,1 @@
-glog|0.4.0|glog|conan|conan-center
-gflags|2.2.2|gflags|conan|conan-center
+
