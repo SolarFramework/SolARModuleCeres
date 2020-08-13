@@ -1,2 +1,1 @@
-glog|0.3.5|glog|thirdParties@github|https://github.com/SolarFramework/binaries/releases/download
-gflags|2.2.1|gflags|thirdParties@github|https://github.com/SolarFramework/binaries/releases/download
+
