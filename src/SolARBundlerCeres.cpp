@@ -1,7 +1,6 @@
 
 #include "SolARBundlerCeres.h"
 #include "SolARCeresLocalParametrization.h"
-
 #include <core/Log.h>
 #include <cmath>
 #include <cstdio>
@@ -9,10 +8,6 @@
 #include <fstream>
 #include <utility>
 #include <string>
-
-
-
-
 
 using namespace std;
 namespace xpcf = org::bcom::xpcf;
@@ -150,6 +145,19 @@ namespace CERES {
 		declareProperty("useSpanningTree", m_useSpanningTree);
         LOG_DEBUG(" SolARBundlerCeres constructor");
     }
+
+	SolARBundlerCeres::~SolARBundlerCeres()
+	{
+		LOG_DEBUG(" SolARBundlerCeres destructor")
+	}
+
+	FrameworkReturnCode SolARBundlerCeres::setMapper(const SRef<api::solver::map::IMapper>& map)
+	{
+		map->getPointCloudManager(m_pointCloudManager);
+		map->getKeyframesManager(m_keyframesManager);
+		map->getCovisibilityGraph(m_covisibilityGraph);
+		return FrameworkReturnCode::_SUCCESS;
+	}
 
 	double SolARBundlerCeres::bundleAdjustment(CamCalibration & K, CamDistortion & D, const std::vector<uint32_t> & selectedKeyframes) {
 
