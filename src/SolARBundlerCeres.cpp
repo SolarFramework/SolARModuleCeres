@@ -437,7 +437,7 @@ namespace CERES {
          }
 
         // Fill neightbour Keyframes
-        for (int i = 0; i < nbNeighbourKeyframes; i++)
+        for (uint32_t i = 0; i < nbNeighbourKeyframes; i++)
         {
             Transform3Df kfpose = neighbourKeyframes[i]->getPose();
             Vector3f r,t;
