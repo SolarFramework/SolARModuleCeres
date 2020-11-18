@@ -1,19 +1,14 @@
 #ifndef SOLARBUNDLERCERES_H
 #define SOLARBUNDLERCERES_H
 
-
+#include "xpcf/component/ConfigurableBase.h"
+#include "SolARCeresAPI.h"
+#include "ceres/ceres.h"
+#include "ceres/rotation.h"
 #include "api/solver/map/IBundler.h"
 #include "api/storage/ICovisibilityGraph.h"
 #include "api/storage/IKeyframesManager.h"
 #include "api/storage/IPointCloudManager.h"
-
-#include "xpcf/component/ConfigurableBase.h"
-
-#include "SolARCeresAPI.h"
-
-
-#include "ceres/ceres.h"
-#include "ceres/rotation.h"
 
 #define POINT_DIM 3
 #define OBSERV_DIM 2
@@ -46,10 +41,15 @@ namespace SolAR {
 				public api::solver::map::IBundler {
 			public:
 				SolARBundlerCeres();
-				~SolARBundlerCeres() = default;
+				~SolARBundlerCeres() override;
 
 				//     org::bcom::xpcf::XPCFErrorCode onConfigured() override final;
 				void unloadComponent() override final;
+
+				/// @brief set mapper reference to optimize
+				/// @param[in] map: the input map.
+				/// @return FrameworkReturnCode::_SUCCESS_ if the map is set, else FrameworkReturnCode::_ERROR.
+				FrameworkReturnCode setMapper(const SRef<api::solver::map::IMapper> &map) override;
 
 				/// @brief solve a non-linear problem related to bundle adjustement statement expressed as:
 				/// minArg(pts3ds,intrinsics,extrinsics) = MIN_cam_i(MIN_3d_j(pts2d_j - reproje(pt3ds_j,intrinsics_i,extrinsics_i)),
