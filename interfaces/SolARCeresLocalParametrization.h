@@ -7,7 +7,6 @@
 namespace xpcf = org::bcom::xpcf;
 
 namespace SolAR {
-	using namespace datastructure;
 	namespace MODULES {
 		namespace CERES {
 			class Fixed3DNormParametrization : public ceres::LocalParameterization
