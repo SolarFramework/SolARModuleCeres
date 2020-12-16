@@ -152,7 +152,7 @@ namespace CERES {
 		LOG_DEBUG(" SolARBundlerCeres destructor")
 	}
 
-	FrameworkReturnCode SolARBundlerCeres::setMapper(const SRef<api::solver::map::IMapper>& map)
+    FrameworkReturnCode SolARBundlerCeres::setMapper(const SRef<api::solver::map::IMapper> map)
 	{
 		map->getPointCloudManager(m_pointCloudManager);
 		map->getKeyframesManager(m_keyframesManager);
