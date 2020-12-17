@@ -43,7 +43,7 @@ int main(int argc, char ** argv) {
     boost::log::core::get()->set_logging_enabled(false);
 #endif
 
-    const std::string path_config = "SolARCeresBundler_conf.xml";
+    const std::string path_config = "SolARTest_ModuleCeres_Bundler_conf.xml";
     SRef<xpcf::IComponentManager> xpcfComponentManager = xpcf::getComponentManagerInstance();
     if (xpcfComponentManager->load(path_config.c_str()) != org::bcom::xpcf::_SUCCESS)
     {
@@ -60,11 +60,11 @@ int main(int argc, char ** argv) {
     LOG_INFO("Loaded components");
 
     std::string scene = "room15";
-    const std::string path_poses        = "../../" + scene + "Bundle/" + scene + "Poses.txt";
-    const std::string path_points3d     = "../../" + scene + "Bundle/" + scene + "Pts3D.txt";;
-    const std::string path_points2d     = "../../" + scene + "Bundle/" + scene + "Pts2D.txt";
-    const std::string path_calibration  = "../../" + scene + "Bundle/" + scene + "Calibration.txt";
-    const std::string path_distortion   = "../../" + scene + "Bundle/" + scene + "Distortion.txt";
+    const std::string path_poses        = "../../data/" + scene + "Bundle/" + scene + "Poses.txt";
+    const std::string path_points3d     = "../../data/" + scene + "Bundle/" + scene + "Pts3D.txt";;
+    const std::string path_points2d     = "../../data/" + scene + "Bundle/" + scene + "Pts2D.txt";
+    const std::string path_calibration  = "../../data/" + scene + "Bundle/" + scene + "Calibration.txt";
+    const std::string path_distortion   = "../../data/" + scene + "Bundle/" + scene + "Distortion.txt";
 
     CamCalibration  intrinsic;
     CamDistortion   distortion;
