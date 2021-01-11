@@ -45,9 +45,11 @@ namespace SolAR {
 			 * <TT>UUID: 4897fc13-682c-4e95-8aba-abd9f7a17193</TT>
 			 *
              * This Bundler component has to inject 3 storage components:
-             *         -IKeyframesManager
-             *         -IPointCloudManager
-             *         -ICovisibilityGraph
+             *	<ul>
+			 *    <li>IKeyframesManager</li>
+             *	  <li>IPointCloudManager</li>
+             *	  <li>ICovisibilityGraph</li>
+			 *  </ul>
              * The definition of the injection of this three storage components will have to be added in the xml configuration file of your application.
 			 */
 
