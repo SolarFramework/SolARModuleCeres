@@ -43,14 +43,40 @@ namespace SolAR {
 			 * @class SolARBundlerCeres
 			 * @brief <B>Applies a bundle adjustment to optimize a 3D map and keyframes.</B>
 			 * <TT>UUID: 4897fc13-682c-4e95-8aba-abd9f7a17193</TT>
-			 *
-             * This Bundler component has to inject 3 storage components:
-             *	<ul>
-			 *    <li>IKeyframesManager</li>
-             *	  <li>IPointCloudManager</li>
-             *	  <li>ICovisibilityGraph</li>
-			 *  </ul>
-             * The definition of the injection of this three storage components will have to be added in the xml configuration file of your application.
+			 * 
+			 * @SolARComponentInjectablesBegin
+             * @SolARComponentInjectable{SolAR::api::storage::IPointCloudManager}
+			 * @SolARComponentInjectable{SolAR::api::storage::IKeyframesManager}
+			 * @SolARComponentInjectable{SolAR::api::storage::ICovisibilityGraph}
+             * @SolARComponentInjectablesEnd
+			 * 
+			 * @SolARComponentPropertiesBegin
+			 * @SolARComponentProperty{ iterationsCount,
+			 *                          number of mx iterations number,
+			 *                          @SolARComponentPropertyDescNum{ int, [0..MAX INT], 10 }}
+			 * @SolARComponentProperty{ fixedMap,
+			 *                          fixing map control (0 = false\, 1 = true),
+			 *                          @SolARComponentPropertyDescNum{ int, [0\,1], 0 }}
+			 * @SolARComponentProperty{ fixedKeyframes,
+			 *                          fixing extrinsic control (0 = false\, 1 = true),
+			 *                          @SolARComponentPropertyDescNum{ int, [0\,1], 0 }}
+			 * @SolARComponentProperty{ fixedIntrinsics,
+			 *                          fixing extrinsic control (0 = false\, 1 = true),
+			 *                          @SolARComponentPropertyDescNum{ int, [0\,1], 1 }}
+			 * @SolARComponentProperty{ fixedFirstPose,
+			 *                          fixing first pose control (0 = false\, 1 = true),
+			 *                          @SolARComponentPropertyDescNum{ int, [0\,1], 1 }}
+			 * @SolARComponentProperty{ fixedNeighbourKeyframes,
+			 *                          fixing neighbour keyframes control (0 = false\, 1 = true),
+			 *                          @SolARComponentPropertyDescNum{ int, [0\,1], 1 }}
+			 * @SolARComponentProperty{ nbMaxFixedKeyframes,
+			 *                          maximum number of fixed neighbour keyframes,
+			 *                          @SolARComponentPropertyDescNum{ uint, [0..MAX UINT], 100 }}
+			 * @SolARComponentProperty{ useSpanningTree,
+			 *                          (0 = false\, 1 = true),
+			 *                          @SolARComponentPropertyDescNum{ int, [0..MAX INT], 0 }}
+			 * @SolARComponentPropertiesEnd
+			 * 
 			 */
 
 			class SOLARCERES_EXPORT_API SolARBundlerCeres : public org::bcom::xpcf::ConfigurableBase,
