@@ -1,3 +1,19 @@
+/**
+ * @copyright Copyright (c) 2017 B-com http://www.b-com.com/
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #ifndef SOLARBUNDLERCERES_H
 #define SOLARBUNDLERCERES_H
 
@@ -20,8 +36,6 @@
 namespace xpcf = org::bcom::xpcf;
 
 namespace SolAR {
-	using namespace datastructure;
-    using namespace api::storage;
 	namespace MODULES {
 		namespace CERES {
 
@@ -29,12 +43,40 @@ namespace SolAR {
 			 * @class SolARBundlerCeres
 			 * @brief <B>Applies a bundle adjustment to optimize a 3D map and keyframes.</B>
 			 * <TT>UUID: 4897fc13-682c-4e95-8aba-abd9f7a17193</TT>
-			 *
-             * This Bundler component has to inject 3 storage components:
-             *         -IKeyframesManager
-             *         -IPointCloudManager
-             *         -ICovisibilityGraph
-             * The definition of the injection of this three storage components will have to be added in the xml configuration file of your application.
+			 * 
+			 * @SolARComponentInjectablesBegin
+             * @SolARComponentInjectable{SolAR::api::storage::IPointCloudManager}
+			 * @SolARComponentInjectable{SolAR::api::storage::IKeyframesManager}
+			 * @SolARComponentInjectable{SolAR::api::storage::ICovisibilityGraph}
+             * @SolARComponentInjectablesEnd
+			 * 
+			 * @SolARComponentPropertiesBegin
+			 * @SolARComponentProperty{ iterationsCount,
+			 *                          number of mx iterations number,
+			 *                          @SolARComponentPropertyDescNum{ int, [0..MAX INT], 10 }}
+			 * @SolARComponentProperty{ fixedMap,
+			 *                          fixing map control (0 = false\, 1 = true),
+			 *                          @SolARComponentPropertyDescNum{ int, [0\,1], 0 }}
+			 * @SolARComponentProperty{ fixedKeyframes,
+			 *                          fixing extrinsic control (0 = false\, 1 = true),
+			 *                          @SolARComponentPropertyDescNum{ int, [0\,1], 0 }}
+			 * @SolARComponentProperty{ fixedIntrinsics,
+			 *                          fixing extrinsic control (0 = false\, 1 = true),
+			 *                          @SolARComponentPropertyDescNum{ int, [0\,1], 1 }}
+			 * @SolARComponentProperty{ fixedFirstPose,
+			 *                          fixing first pose control (0 = false\, 1 = true),
+			 *                          @SolARComponentPropertyDescNum{ int, [0\,1], 1 }}
+			 * @SolARComponentProperty{ fixedNeighbourKeyframes,
+			 *                          fixing neighbour keyframes control (0 = false\, 1 = true),
+			 *                          @SolARComponentPropertyDescNum{ int, [0\,1], 1 }}
+			 * @SolARComponentProperty{ nbMaxFixedKeyframes,
+			 *                          maximum number of fixed neighbour keyframes,
+			 *                          @SolARComponentPropertyDescNum{ uint, [0..MAX UINT], 100 }}
+			 * @SolARComponentProperty{ useSpanningTree,
+			 *                          (0 = false\, 1 = true),
+			 *                          @SolARComponentPropertyDescNum{ int, [0..MAX INT], 0 }}
+			 * @SolARComponentPropertiesEnd
+			 * 
 			 */
 
 			class SOLARCERES_EXPORT_API SolARBundlerCeres : public org::bcom::xpcf::ConfigurableBase,
@@ -49,7 +91,7 @@ namespace SolAR {
 				/// @brief set mapper reference to optimize
 				/// @param[in] map: the input map.
 				/// @return FrameworkReturnCode::_SUCCESS_ if the map is set, else FrameworkReturnCode::_ERROR.
-				FrameworkReturnCode setMapper(const SRef<api::solver::map::IMapper> &map) override;
+                FrameworkReturnCode setMapper(const SRef<api::solver::map::IMapper> map) override;
 
 				/// @brief solve a non-linear problem related to bundle adjustement statement expressed as:
 				/// minArg(pts3ds,intrinsics,extrinsics) = MIN_cam_i(MIN_3d_j(pts2d_j - reproje(pt3ds_j,intrinsics_i,extrinsics_i)),
@@ -57,7 +99,7 @@ namespace SolAR {
 				/// @param[in, out] D: camera distorsion parameters responsible of 3D points generation
 				/// @param[in] selectKeyframes : selected views to bundle following a given strategies. If it is empty then take all keyframes into account to perform global bundle adjustment.
 				/// @return the mean re-projection error after optimization.
-				double bundleAdjustment(CamCalibration & K, CamDistortion & D, const std::vector<uint32_t> & selectKeyframes = {}) override;
+				double bundleAdjustment(datastructure::CamCalibration & K, datastructure::CamDistortion & D, const std::vector<uint32_t> & selectKeyframes = {}) override;
 
 			private:
                 /// @brief number of mx iterations number.
@@ -77,17 +119,17 @@ namespace SolAR {
 				int	m_useSpanningTree = 0;
 
                 /// @brief reference to the storage component use to manage the point cloud.
-                SRef<IPointCloudManager>    m_pointCloudManager;
+                SRef<api::storage::IPointCloudManager>    m_pointCloudManager;
                 /// @brief reference to the storage component use to manage the keyframes.
-                SRef<IKeyframesManager>     m_keyframesManager;
+                SRef<api::storage::IKeyframesManager>     m_keyframesManager;
 				/// @brief reference to the storage component use to manage the covisibility graph.
-				SRef<ICovisibilityGraph>     m_covisibilityGraph;
+				SRef<api::storage::ICovisibilityGraph>     m_covisibilityGraph;
 
 				/// @brief transform a rotation matrix to axis-anle representation using Rodrigue's formula.
 				/// @param[in]  R:              a pose transform matrix
 				/// @param[out] r:             rodrigues angles
 				/// keeps translation matrix unchanged
-				inline void toRodrigues(Transform3Df &R, Vector3f&r) {
+				inline void toRodrigues(datastructure::Transform3Df &R, datastructure::Vector3f&r) {
 					const double small = 1e-6;
 					double th = acos
 					(0.5*(fmax(R(0, 0) + R(1, 1) + R(2, 2), -1.0) - 1.0));
@@ -149,7 +191,7 @@ namespace SolAR {
 				/// @param[in]  r:             Rodrigue's angles
 				/// @param[out] R:             rotation matrix
 				/// initialize translation matrix to zero
-				inline void iRodrigues(Vector3d &r, Transform3Df&R) {
+				inline void iRodrigues(datastructure::Vector3d &r, datastructure::Transform3Df&R) {
 
 					const double small = 1e-6;
 
