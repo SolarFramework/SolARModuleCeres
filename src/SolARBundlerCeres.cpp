@@ -629,6 +629,11 @@ namespace CERES {
 		}
         return errorReproj / nbObservations;
     }
+	double SolARBundlerCeres::optimizeSim3(CamCalibration & K1, CamCalibration & K2, const SRef<Keyframe>& keyframe1, const SRef<Keyframe>& keyframe2, const std::vector<DescriptorMatch>& matches, const std::vector<Point3Df>& pts3D1, const std::vector<Point3Df>& pts3D2, Transform3Df & pose)
+	{
+		LOG_WARNING("Not yet implemented");
+		return 0.0;
+	}
 }
 }
 }
