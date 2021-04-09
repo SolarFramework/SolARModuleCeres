@@ -22,7 +22,7 @@
 #include "ceres/ceres.h"
 #include "ceres/rotation.h"
 #include "api/solver/map/IBundler.h"
-#include "api/storage/ICovisibilityGraph.h"
+#include "api/storage/ICovisibilityGraphManager.h"
 #include "api/storage/IKeyframesManager.h"
 #include "api/storage/IPointCloudManager.h"
 
@@ -36,6 +36,7 @@
 namespace xpcf = org::bcom::xpcf;
 
 namespace SolAR {
+	using namespace datastructure;
 	namespace MODULES {
 		namespace CERES {
 
@@ -47,7 +48,7 @@ namespace SolAR {
 			 * @SolARComponentInjectablesBegin
              * @SolARComponentInjectable{SolAR::api::storage::IPointCloudManager}
 			 * @SolARComponentInjectable{SolAR::api::storage::IKeyframesManager}
-			 * @SolARComponentInjectable{SolAR::api::storage::ICovisibilityGraph}
+			 * @SolARComponentInjectable{SolAR::api::storage::ICovisibilityGraphManager}
              * @SolARComponentInjectablesEnd
 			 * 
 			 * @SolARComponentPropertiesBegin
@@ -88,10 +89,10 @@ namespace SolAR {
 				//     org::bcom::xpcf::XPCFErrorCode onConfigured() override final;
 				void unloadComponent() override final;
 
-				/// @brief set mapper reference to optimize
-				/// @param[in] map: the input map.
+				/// @brief set map reference to optimize
+				/// @param[in] map the input map.
 				/// @return FrameworkReturnCode::_SUCCESS_ if the map is set, else FrameworkReturnCode::_ERROR.
-                FrameworkReturnCode setMapper(const SRef<api::solver::map::IMapper> map) override;
+                FrameworkReturnCode setMap(const SRef<datastructure::Map> map) override;
 
 				/// @brief solve a non-linear problem related to bundle adjustement statement expressed as:
 				/// minArg(pts3ds,intrinsics,extrinsics) = MIN_cam_i(MIN_3d_j(pts2d_j - reproje(pt3ds_j,intrinsics_i,extrinsics_i)),
@@ -136,7 +137,7 @@ namespace SolAR {
                 /// @brief reference to the storage component use to manage the keyframes.
                 SRef<api::storage::IKeyframesManager>     m_keyframesManager;
 				/// @brief reference to the storage component use to manage the covisibility graph.
-				SRef<api::storage::ICovisibilityGraph>     m_covisibilityGraph;
+				SRef<api::storage::ICovisibilityGraphManager>     m_covisibilityGraphManager;
 
 				/// @brief transform a rotation matrix to axis-anle representation using Rodrigue's formula.
 				/// @param[in]  R:              a pose transform matrix
