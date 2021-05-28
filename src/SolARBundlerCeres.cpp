@@ -150,7 +150,7 @@ namespace CERES {
         addInterface<IBundler>(this);
         declareInjectable<IPointCloudManager>(m_pointCloudManager);
         declareInjectable<IKeyframesManager>(m_keyframesManager);
-		declareInjectable<ICovisibilityGraph>(m_covisibilityGraph);
+		declareInjectable<ICovisibilityGraphManager>(m_covisibilityGraphManager);
         declareProperty("iterationsCount", m_iterationsNo);
         declareProperty("fixedMap", m_fixedMap);
         declareProperty("fixedKeyframes", m_fixedKeyframes);
@@ -167,11 +167,11 @@ namespace CERES {
 		LOG_DEBUG(" SolARBundlerCeres destructor")
 	}
 
-    FrameworkReturnCode SolARBundlerCeres::setMapper(const SRef<api::solver::map::IMapper> map)
+    FrameworkReturnCode SolARBundlerCeres::setMap(const SRef<datastructure::Map> map)
 	{
-		map->getPointCloudManager(m_pointCloudManager);
-		map->getKeyframesManager(m_keyframesManager);
-		map->getCovisibilityGraph(m_covisibilityGraph);
+		m_pointCloudManager->setPointCloud(map->getConstPointCloud());
+		m_keyframesManager->setKeyframeCollection(map->getConstKeyframeCollection());
+		m_covisibilityGraphManager->setCovisibilityGraph(map->getConstCovisibilityGraph());
 		return FrameworkReturnCode::_SUCCESS;
 	}
 
@@ -266,7 +266,7 @@ namespace CERES {
 			// get the maximal spanning tree
 			std::vector<std::tuple<uint32_t, uint32_t, float>> edgesSpanningTree;
 			float totalWeights;
-			m_covisibilityGraph->maximalSpanningTree(edgesSpanningTree, totalWeights);
+			m_covisibilityGraphManager->maximalSpanningTree(edgesSpanningTree, totalWeights);
 
 			// get cloud points belong to maximal spanning tree	
 			std::set<uint32_t> idxCloudPoints;
@@ -629,6 +629,11 @@ namespace CERES {
 		}
         return errorReproj / nbObservations;
     }
+	double SolARBundlerCeres::optimizeSim3(CamCalibration & K1, CamCalibration & K2, const SRef<Keyframe>& keyframe1, const SRef<Keyframe>& keyframe2, const std::vector<DescriptorMatch>& matches, const std::vector<Point3Df>& pts3D1, const std::vector<Point3Df>& pts3D2, Transform3Df & pose)
+	{
+		LOG_WARNING("Not yet implemented");
+		return 0.0;
+	}
 }
 }
 }

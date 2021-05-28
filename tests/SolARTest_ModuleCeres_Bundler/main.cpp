@@ -26,7 +26,7 @@
 #include "api/solver/map/IBundler.h"
 #include "api/storage/IKeyframesManager.h"
 #include "api/storage/IPointCloudManager.h"
-#include "api/storage/ICovisibilityGraph.h"
+#include "api/storage/ICovisibilityGraphManager.h"
 #include "core/Log.h"
 
 using namespace SolAR;
@@ -53,7 +53,7 @@ int main(int argc, char ** argv) {
 
     auto pointCloudManager = xpcfComponentManager->resolve<IPointCloudManager>();
     auto keyframesManager = xpcfComponentManager->resolve<IKeyframesManager>();
-    auto covisibilityGraph = xpcfComponentManager->resolve<ICovisibilityGraph>();
+    auto covisibilityGraphManager = xpcfComponentManager->resolve<ICovisibilityGraphManager>();
     auto bundler = xpcfComponentManager->resolve<api::solver::map::IBundler>();
     auto viewer3DPoints = xpcfComponentManager->resolve<display::I3DPointsViewer>();
 
