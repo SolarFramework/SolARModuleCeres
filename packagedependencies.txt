@@ -1,2 +1,2 @@
 SolARFramework|0.10.0|SolARFramework|SolARBuild@github|https://github.com/SolarFramework/SolarFramework/releases/download
-ceres-solver|2.0.0rc1|ceres-solver|conan-solar@conan|conan-solar|default
+ceres-solver|2.0.0|ceres-solver|conan-solar@conan|conan-solar|default
