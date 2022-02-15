@@ -89,3 +89,5 @@ tests/bin
 *.tmp
 .git Merge
 tests/run.sh
+
+bundle_system_install.sh
