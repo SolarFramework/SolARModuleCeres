@@ -1,2 +1,2 @@
 SolARFramework|0.11.0|SolARFramework|SolARBuild@github|https://github.com/SolarFramework/SolarFramework/releases/download
-ceres-solver|2.0.0|ceres-solver|conan-solar@conan|conan-solar#https://artifact.b-com.com/api/conan/solar-conan-local#0|default
+ceres-solver|2.0.0|ceres-solver|conan|conan-center|default
