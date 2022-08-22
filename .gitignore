@@ -8,6 +8,9 @@
 *.obj
 *build*
 
+.build-rules/
+tests/*/.build-rules/
+
 # Precompiled Headers
 *.gch
 *.pch

@@ -175,7 +175,7 @@ namespace CERES {
 		return FrameworkReturnCode::_SUCCESS;
 	}
 
-	double SolARBundlerCeres::bundleAdjustment(CamCalibration & K, CamDistortion & D, const std::vector<uint32_t> & selectedKeyframes) {
+	double SolARBundlerCeres::bundleAdjustment(const std::vector<uint32_t> & selectedKeyframes) {
 
         // Init Ceres Problem
         // ------------------
@@ -430,6 +430,7 @@ namespace CERES {
         // Fill local Keyframes
         for (uint32_t i = 0; i < nbLocalKeyframes; i++)
         {
+			const CameraParameters& camParams = localKeyframes[i]->getCameraParameters();
             Transform3Df kfpose = localKeyframes[i]->getPose();
             Vector3f r,t;
 
@@ -449,20 +450,21 @@ namespace CERES {
             parameters[EXT_DIM*i + 5] = t[2];
 
 
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 0] = K(0, 0);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 1] = K(1, 1);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 2] = K(0, 2);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 3] = K(1, 2);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 4] = D(0);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 5] = D(1);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 6] = D(2);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 7] = D(3);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 8] = D(4);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 0] = camParams.intrinsic(0, 0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 1] = camParams.intrinsic(1, 1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 2] = camParams.intrinsic(0, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 3] = camParams.intrinsic(1, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 4] = camParams.distortion(0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 5] = camParams.distortion(1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 6] = camParams.distortion(2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 7] = camParams.distortion(3);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 8] = camParams.distortion(4);
          }
 
         // Fill neightbour Keyframes
         for (uint32_t i = 0; i < nbNeighbourKeyframes; i++)
         {
+			const CameraParameters& camParams = neighbourKeyframes[i]->getCameraParameters();
             Transform3Df kfpose = neighbourKeyframes[i]->getPose();
             Vector3f r,t;
 
@@ -482,15 +484,15 @@ namespace CERES {
             parameters[EXT_DIM*(i+nbLocalKeyframes) + 5] = t[2];
 
 
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 0] = K(0, 0);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 1] = K(1, 1);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 2] = K(0, 2);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 3] = K(1, 2);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 4] = D(0);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 5] = D(1);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 6] = D(2);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 7] = D(3);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 8] = D(4);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 0] = camParams.intrinsic(0, 0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 1] = camParams.intrinsic(1, 1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 2] = camParams.intrinsic(0, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 3] = camParams.intrinsic(1, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 4] = camParams.distortion(0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 5] = camParams.distortion(1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 6] = camParams.distortion(2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 7] = camParams.distortion(3);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 8] = camParams.distortion(4);
          }
 
         // Fill cloud point
@@ -598,16 +600,7 @@ namespace CERES {
 
         if (!m_fixedIntrinsics)
         {
-            K(0,0) = parameters[nbKeyframes * EXT_DIM + 0];
-            K(1,1) = parameters[nbKeyframes * EXT_DIM + 1];
-            K(0,2) = parameters[nbKeyframes * EXT_DIM + 2];
-            K(1,2) = parameters[nbKeyframes * EXT_DIM + 3];
-
-            D(0) = parameters[nbKeyframes * EXT_DIM + 4];
-            D(1) = parameters[nbKeyframes * EXT_DIM + 5];
-            D(2) = parameters[nbKeyframes * EXT_DIM + 6];
-            D(3) = parameters[nbKeyframes * EXT_DIM + 7];
-            D(4) = parameters[nbKeyframes * EXT_DIM + 8];
+            LOG_INFO("Not support to change camera parameters")
         }
 
 		// get the final mean squared reprojection error
@@ -629,7 +622,12 @@ namespace CERES {
 		}
         return errorReproj / nbObservations;
     }
-	double SolARBundlerCeres::optimizeSim3(CamCalibration & K1, CamCalibration & K2, const SRef<Keyframe>& keyframe1, const SRef<Keyframe>& keyframe2, const std::vector<DescriptorMatch>& matches, const std::vector<Point3Df>& pts3D1, const std::vector<Point3Df>& pts3D2, Transform3Df & pose)
+    double SolARBundlerCeres::optimizeSim3(const SRef<SolAR::datastructure::Keyframe>& keyframe1,
+                                           const SRef<SolAR::datastructure::Keyframe>& keyframe2,
+                                           const std::vector<SolAR::datastructure::DescriptorMatch>& matches,
+                                           const std::vector<SolAR::datastructure::Point3Df> & pts3D1,
+                                           const std::vector<SolAR::datastructure::Point3Df> & pts3D2,
+                                           SolAR::datastructure::Transform3Df & pose)
 	{
 		LOG_WARNING("Not yet implemented");
 		return 0.0;
