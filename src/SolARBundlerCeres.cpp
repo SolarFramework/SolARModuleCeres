@@ -148,6 +148,7 @@ namespace CERES {
     SolARBundlerCeres::SolARBundlerCeres() :ConfigurableBase(xpcf::toUUID<SolARBundlerCeres>())
     {
         addInterface<IBundler>(this);
+        declareInjectable<ICameraParametersManager>(m_cameraParametersManager);
         declareInjectable<IPointCloudManager>(m_pointCloudManager);
         declareInjectable<IKeyframesManager>(m_keyframesManager);
 		declareInjectable<ICovisibilityGraphManager>(m_covisibilityGraphManager);
@@ -170,8 +171,10 @@ namespace CERES {
     FrameworkReturnCode SolARBundlerCeres::setMap(const SRef<datastructure::Map> map)
 	{
 		m_pointCloudManager->setPointCloud(map->getConstPointCloud());
+        m_cameraParametersManager->setCameraParametersCollection(map->getConstCameraParametersCollection());
 		m_keyframesManager->setKeyframeCollection(map->getConstKeyframeCollection());
 		m_covisibilityGraphManager->setCovisibilityGraph(map->getConstCovisibilityGraph());
+        m_map = map;
 		return FrameworkReturnCode::_SUCCESS;
 	}
 
@@ -430,7 +433,12 @@ namespace CERES {
         // Fill local Keyframes
         for (uint32_t i = 0; i < nbLocalKeyframes; i++)
         {
-			const CameraParameters& camParams = localKeyframes[i]->getCameraParameters();
+            SRef<CameraParameters> camParams;
+            if (m_cameraParametersManager->getCameraParameters(localKeyframes[i]->getCameraID(), camParams) != FrameworkReturnCode :: _SUCCESS)
+            {
+                LOG_WARNING("Camera parameteres with id {} does not exists in the camera parameters manager", localKeyframes[i]->getCameraID());
+                continue;
+            }
             Transform3Df kfpose = localKeyframes[i]->getPose();
             Vector3f r,t;
 
@@ -450,21 +458,26 @@ namespace CERES {
             parameters[EXT_DIM*i + 5] = t[2];
 
 
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 0] = camParams.intrinsic(0, 0);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 1] = camParams.intrinsic(1, 1);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 2] = camParams.intrinsic(0, 2);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 3] = camParams.intrinsic(1, 2);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 4] = camParams.distortion(0);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 5] = camParams.distortion(1);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 6] = camParams.distortion(2);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 7] = camParams.distortion(3);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 8] = camParams.distortion(4);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 0] = camParams->intrinsic(0, 0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 1] = camParams->intrinsic(1, 1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 2] = camParams->intrinsic(0, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 3] = camParams->intrinsic(1, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 4] = camParams->distortion(0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 5] = camParams->distortion(1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 6] = camParams->distortion(2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 7] = camParams->distortion(3);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*i + 8] = camParams->distortion(4);
          }
 
         // Fill neightbour Keyframes
         for (uint32_t i = 0; i < nbNeighbourKeyframes; i++)
         {
-			const CameraParameters& camParams = neighbourKeyframes[i]->getCameraParameters();
+            SRef<CameraParameters> camParams;
+            if (m_cameraParametersManager->getCameraParameters(neighbourKeyframes[i]->getCameraID(), camParams) != FrameworkReturnCode :: _SUCCESS)
+            {
+                LOG_WARNING("Camera parameteres with id {} does not exists in the camera parameters manager", neighbourKeyframes[i]->getCameraID());
+                continue;
+            }
             Transform3Df kfpose = neighbourKeyframes[i]->getPose();
             Vector3f r,t;
 
@@ -484,15 +497,15 @@ namespace CERES {
             parameters[EXT_DIM*(i+nbLocalKeyframes) + 5] = t[2];
 
 
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 0] = camParams.intrinsic(0, 0);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 1] = camParams.intrinsic(1, 1);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 2] = camParams.intrinsic(0, 2);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 3] = camParams.intrinsic(1, 2);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 4] = camParams.distortion(0);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 5] = camParams.distortion(1);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 6] = camParams.distortion(2);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 7] = camParams.distortion(3);
-            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 8] = camParams.distortion(4);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 0] = camParams->intrinsic(0, 0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 1] = camParams->intrinsic(1, 1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 2] = camParams->intrinsic(0, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 3] = camParams->intrinsic(1, 2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 4] = camParams->distortion(0);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 5] = camParams->distortion(1);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 6] = camParams->distortion(2);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 7] = camParams->distortion(3);
+            parameters[nbKeyframes * EXT_DIM + INT_DIM*(i+nbLocalKeyframes) + 8] = camParams->distortion(4);
          }
 
         // Fill cloud point
