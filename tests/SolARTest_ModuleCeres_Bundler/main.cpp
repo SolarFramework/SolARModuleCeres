@@ -25,6 +25,7 @@
 #include "api/display/I3DPointsViewer.h"
 #include "api/solver/map/IBundler.h"
 #include "api/storage/IKeyframesManager.h"
+#include "api/storage/ICameraParametersManager.h"
 #include "api/storage/IPointCloudManager.h"
 #include "api/storage/ICovisibilityGraphManager.h"
 #include "core/Log.h"
@@ -53,6 +54,7 @@ int main(int argc, char ** argv) {
 
     auto pointCloudManager = xpcfComponentManager->resolve<IPointCloudManager>();
     auto keyframesManager = xpcfComponentManager->resolve<IKeyframesManager>();
+    auto cameraParametersManager = xpcfComponentManager->resolve<ICameraParametersManager>();
     auto covisibilityGraphManager = xpcfComponentManager->resolve<ICovisibilityGraphManager>();
     auto bundler = xpcfComponentManager->resolve<api::solver::map::IBundler>();
     auto viewer3DPoints = xpcfComponentManager->resolve<display::I3DPointsViewer>();
@@ -69,6 +71,7 @@ int main(int argc, char ** argv) {
     CamCalibration  intrinsic;
     CamDistortion   distortion;
     CameraParameters camParams;
+    uint32_t cameraID;
 
     auto load2DPoints = [&](const std::string & path_measures) {
         int N;
@@ -103,7 +106,7 @@ int main(int argc, char ** argv) {
                     SRef<Keyframe> keyframe = xpcf::utils::make_shared<Keyframe>();
                     keyframe->setKeypoints(points2D);
                     keyframe->setUndistortedKeypoints(points2D);
-                    keyframe->setCameraParameters(camParams);
+                    keyframe->setCameraID(cameraID);
                     keyframesManager->addKeyframe(keyframe);
                 }
             }
@@ -211,6 +214,9 @@ int main(int argc, char ** argv) {
     loadDistortions(path_distortion);
     camParams.intrinsic = intrinsic;
     camParams.distortion = distortion;
+    cameraParametersManager->addCameraParameters(camParams);
+    cameraID = camParams.id;
+
     load2DPoints(path_points2d);
     loadExtrinsics(path_poses);    
     load3DPoints(path_points3d);
