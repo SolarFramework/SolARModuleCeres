@@ -7,6 +7,9 @@
 *.o
 *.obj
 
+*build*
+deploy
+
 .build-rules/
 tests/*/.build-rules/
 
@@ -93,3 +96,4 @@ tests/bin
 tests/run.sh
 
 bundle_system_install.sh
+
