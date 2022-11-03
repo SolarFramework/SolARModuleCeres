@@ -22,6 +22,7 @@
 #include "ceres/ceres.h"
 #include "ceres/rotation.h"
 #include "api/solver/map/IBundler.h"
+#include "api/storage/ICameraParametersManager.h"
 #include "api/storage/ICovisibilityGraphManager.h"
 #include "api/storage/IKeyframesManager.h"
 #include "api/storage/IPointCloudManager.h"
@@ -46,6 +47,7 @@ namespace SolAR {
 			 * <TT>UUID: 4897fc13-682c-4e95-8aba-abd9f7a17193</TT>
 			 * 
 			 * @SolARComponentInjectablesBegin
+             * @SolARComponentInjectable{SolAR::api::storage::ICameraParametersManager}
              * @SolARComponentInjectable{SolAR::api::storage::IPointCloudManager}
 			 * @SolARComponentInjectable{SolAR::api::storage::IKeyframesManager}
 			 * @SolARComponentInjectable{SolAR::api::storage::ICovisibilityGraphManager}
@@ -131,7 +133,11 @@ namespace SolAR {
                 /// @brief Maximum number of fixed neighbour keyframes.
                 unsigned int m_nbMaxFixedKeyframes = 100;
 				int	m_useSpanningTree = 0;
+                /// @brief The map on which we apply the bundling
+                SRef<datastructure::Map> m_map;
 
+                /// @brief reference to the storage component use to manage camera parameters.
+                SRef<api::storage::ICameraParametersManager>    m_cameraParametersManager;
                 /// @brief reference to the storage component use to manage the point cloud.
                 SRef<api::storage::IPointCloudManager>    m_pointCloudManager;
                 /// @brief reference to the storage component use to manage the keyframes.
