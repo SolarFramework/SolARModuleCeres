@@ -7,7 +7,7 @@ QMAKE_PROJECT_DEPTH = 0
 ## global defintions : target lib name, version
 TARGET = SolARTest_ModuleCeres_Bundler
 VERSION=1.0.0
-PROJECTDEPLOYDIR = $${PWD}/..
+PROJECTDEPLOYDIR = $${PWD}/../deploy
 
 DEFINES += MYVERSION=$${VERSION}
 CONFIG += c++1z
@@ -94,7 +94,8 @@ INSTALLS += configfile
 
 
 DISTFILES+= \
-    packagedependencies.txt
+    packagedependencies.txt \
+    SolARTest_ModuleCeres_Bundler_conf.xml
 
 #NOTE : Must be placed at the end of the .pro
 include ($$shell_quote($$shell_path($${QMAKE_REMAKEN_RULES_ROOT}/remaken_install_target.pri)))) # Shell_quote & shell_path required for visual on windows
